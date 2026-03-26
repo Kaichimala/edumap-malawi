@@ -1,7 +1,7 @@
 import { useAuth } from '../../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
 import { TbMapRoute } from 'react-icons/tb'
-import { LuLogOut }   from 'react-icons/lu'
+import { LuLogOut } from 'react-icons/lu'
 
 export default function Navbar({ level, setLevel }) {
   const { signOut } = useAuth()
@@ -34,11 +34,10 @@ export default function Navbar({ level, setLevel }) {
           <button
             key={l}
             onClick={() => setLevel(l)}
-            className={`px-4 py-1.5 rounded-md capitalize text-sm font-medium transition-all duration-150 ${
-              level === l
+            className={`px-4 py-1.5 rounded-md capitalize text-sm font-medium transition-all duration-150 ${level === l
                 ? 'bg-brand-500 text-white shadow-md'
                 : 'text-brand-200 hover:bg-white/10 hover:text-white'
-            }`}
+              }`}
           >
             {l}
           </button>

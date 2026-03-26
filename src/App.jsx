@@ -18,7 +18,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
