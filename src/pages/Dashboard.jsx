@@ -1,36 +1,31 @@
 import { useState } from 'react'
-import MapView   from '../components/Map/MapView'
-import Sidebar   from '../components/Sidebar/Sidebar'
+import Navbar from '../components/Navbar/Navbar'
+import Sidebar from '../components/Sidebar/Sidebar'
 import DetailPanel from '../components/DetailPanel/DetailPanel'
+import MapView from '../components/Map/MapView'
 import { useDistricts } from '../hooks/useDistricts'
 
 export default function Dashboard() {
   const { districts, loading } = useDistricts()
   const [selectedDistrict, setSelectedDistrict] = useState(null)
-  const [level, setLevel] = useState('primary')  // 'primary' | 'secondary' | 'tertiary'
-  const [filter, setFilter] = useState('all')     // 'all' | 'Critical' | 'High' | 'Medium' | 'Low'
+  const [level, setLevel] = useState('primary')
+  const [filter, setFilter] = useState('all')
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-xl">Loading EduMap...</div>
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-brand-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin" />
+          <p className="text-sm text-slate-500 font-medium">Loading EduMap…</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col h-screen">
-
-      {/* Top Navbar */}
-      <nav className="bg-gray-900 text-white px-6 py-3 flex items-center gap-6">
-        <span className="font-bold text-lg">EduMap Malawi</span>
-
-        {/* Level Toggle */}
-        {['primary','secondary','tertiary'].map(l => (
-          <button
-            key={l}
-            onClick={() => setLevel(l)}
-            className={`px-4 py-1 rounded capitalize text-sm font-medium transition
-              ${level === l ? 'bg-blue-500 text-white' : 'text-gray-300 hover:text-white'}`}
-          >
-            {l}
-          </button>
-        ))}
-      </nav>
+    <div className="flex flex-col h-screen bg-slate-50">
+      {/* Navbar — level toggle lives here now */}
+      <Navbar level={level} setLevel={setLevel} />
 
       {/* Main Layout */}
       <div className="flex flex-1 overflow-hidden">
@@ -46,7 +41,7 @@ export default function Dashboard() {
         />
 
         {/* Map */}
-        <div className="flex-1">
+        <div className="flex-1 relative">
           <MapView
             districts={districts}
             selectedDistrict={selectedDistrict}
@@ -63,7 +58,6 @@ export default function Dashboard() {
             onClose={() => setSelectedDistrict(null)}
           />
         )}
-
       </div>
     </div>
   )
