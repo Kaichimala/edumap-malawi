@@ -1,55 +1,70 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { TbMapRoute }                from 'react-icons/tb'
-import { MdErrorOutline }            from 'react-icons/md'
-import { LuEye, LuEyeOff }          from 'react-icons/lu'
+import { TbMapRoute } from 'react-icons/tb'
+import { MdErrorOutline, MdWarningAmber } from 'react-icons/md'
+import { LuEye, LuEyeOff } from 'react-icons/lu'
 import { AiOutlineLoading3Quarters } from 'react-icons/ai'
-
-// ─── Mock user accounts (replace with Supabase when ready) ───────────────────
-const MOCK_USERS = [
-  { email: 'admin@edumap.mw',   password: 'edumap2025', name: 'Admin User',     role: 'admin'  },
-  { email: 'officer@moe.mw',    password: 'officer123', name: 'Planning Officer', role: 'officer' },
-  { email: 'analyst@edumap.mw', password: 'analyst123', name: 'Data Analyst',    role: 'analyst' },
-]
+import { isSupabaseConfigured } from '../lib/supabaseClient'
 
 export default function Login() {
-  const { signIn } = useAuth()
-  const navigate   = useNavigate()
-  const [tab, setTab]               = useState('signin')   // 'signin' | 'signup'
-  const [email, setEmail]           = useState('')
-  const [password, setPassword]     = useState('')
-  const [name, setName]             = useState('')
-  const [error, setError]           = useState(null)
-  const [success, setSuccess]       = useState(null)
-  const [loading, setLoading]       = useState(false)
-  const [showPass, setShowPass]     = useState(false)
+  const { signIn, signUp } = useAuth()
+  const navigate = useNavigate()
+  const [tab, setTab] = useState('signin')   // 'signin' | 'signup'
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [showPass, setShowPass] = useState(false)
 
   function reset() { setError(null); setSuccess(null) }
 
   /* ─── Sign In ────────────────────────────────────────────────────────────── */
-  function handleSignIn(e) {
+  async function handleSignIn(e) {
     e.preventDefault()
     reset()
     setLoading(true)
 
-    setTimeout(() => {
-      const { error } = signIn(email, password)
+    try {
+      const { error } = await signIn(email, password)
+      if (error) throw error
+      navigate('/')
+    } catch (err) {
+      setError(err.message)
+    } finally {
       setLoading(false)
-      if (error) setError(error.message)
-      else navigate('/')
-    }, 600)
+    }
   }
 
-  /* ─── Sign Up (mock — just validates and shows success) ──────────────────── */
-  function handleSignUp(e) {
+  /* ─── Sign Up ────────────────────────────────────────────────────────────── */
+  async function handleSignUp(e) {
     e.preventDefault()
     reset()
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
-    const exists = MOCK_USERS.some(u => u.email === email.trim().toLowerCase())
-    if (exists) { setError('An account with this email already exists.'); return }
-    // In real version: call supabase.auth.signUp()
-    setSuccess('Account registered! In demo mode, use an existing demo account to sign in.')
+    setLoading(true)
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      setLoading(false)
+      return
+    }
+
+    try {
+      const { error } = await signUp(email, password, name)
+      if (error) throw error
+      setSuccess('Account created successfully! Redirecting to sign in…')
+      setTimeout(() => {
+        setTab('signin')
+        setSuccess(null)
+        setPassword('')
+        setName('')
+      }, 1500)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -81,11 +96,10 @@ export default function Login() {
                 <button
                   key={key}
                   onClick={() => { setTab(key); reset() }}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    tab === key
-                      ? 'bg-brand-500 text-white shadow-md'
-                      : 'text-slate-500 hover:text-brand-700'
-                  }`}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${tab === key
+                    ? 'bg-brand-500 text-white shadow-md'
+                    : 'text-slate-500 hover:text-brand-700'
+                    }`}
                 >
                   {label}
                 </button>
@@ -95,6 +109,19 @@ export default function Login() {
 
           {/* ── Form Body ── */}
           <div className="px-8 py-6">
+
+            {!isSupabaseConfigured && (
+              <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-sm">
+                  <MdWarningAmber className="w-5 h-5 text-amber-500" />
+                  Supabase Not Configured
+                </div>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  Please add <code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code> and
+                  <code className="bg-amber-100 px-1 rounded ml-1">VITE_SUPABASE_ANON_KEY</code> to your <code className="font-bold underline">.env</code> file to enable live authentication.
+                </p>
+              </div>
+            )}
 
             {/* Error / Success banners */}
             {error && (
@@ -187,22 +214,16 @@ export default function Login() {
                     </button>
                   </div>
                 </div>
-                <button type="submit"
+                <button type="submit" disabled={loading}
                   className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg
-                    text-sm transition-colors flex items-center justify-center gap-2 mt-1">
-                  Create Account
+                    text-sm transition-colors flex items-center justify-center gap-2 mt-1 disabled:opacity-60 disabled:cursor-not-allowed">
+                  {loading ? <><AiOutlineLoading3Quarters className="w-4 h-4 animate-spin" /> Creating Account…</> : 'Create Account'}
                 </button>
               </form>
             )}
           </div>
 
-          {/* ── Demo hint ── */}
-          <div className="px-8 py-3 bg-brand-50 border-t border-slate-100">
-            <p className="text-xs text-slate-400 text-center">
-              Demo accounts: &nbsp;
-              <span className="font-medium text-slate-500">admin@edumap.mw</span> · <span className="font-medium text-slate-500">edumap2025</span>
-            </p>
-          </div>
+          {/* ── Footer ── */}
           <div className="px-8 py-3 bg-slate-50 border-t border-slate-100 text-center">
             <p className="text-xs text-slate-400">Ministry of Education, Malawi · Secure Access Only</p>
           </div>

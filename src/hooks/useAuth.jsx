@@ -1,57 +1,68 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext(null)
 
-// Demo credentials — easy to swap when Supabase is ready
-const DEMO_EMAIL    = 'admin@edumap.mw'
-const DEMO_PASSWORD = 'edumap2025'
-const SESSION_KEY   = 'edumap_session'
-
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function saveSession(user) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user))
-}
-
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY)
-}
-
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(() => loadSession())
+  const [session, setSession] = useState(null)
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  function signIn(email, password) {
-    if (
-      email.trim().toLowerCase() === DEMO_EMAIL &&
-      password === DEMO_PASSWORD
-    ) {
-      const user = { email, name: 'Admin User', role: 'admin' }
-      saveSession(user)
-      setSession(user)
-      return { error: null }
-    }
-    return { error: { message: 'Invalid email or password. Use admin@edumap.mw / edumap2025' } }
+  useEffect(() => {
+    // Check active sessions and sets the user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    // Listen for changes on auth state (logged in, signed out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function signUp(email, password, name) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        },
+      },
+    })
+    return { data, error }
   }
 
-  function signOut() {
-    clearSession()
-    setSession(null)
+  async function signIn(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { data, error }
+  }
+
+  async function signOut() {
+    const { error } = await supabase.auth.signOut()
+    return { error }
   }
 
   return (
-    <AuthContext.Provider value={{ session, signIn, signOut }}>
-      {children}
+    <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut }}>
+      {!loading && children}
     </AuthContext.Provider>
   )
 }
 
 export function useAuth() {
-  return useContext(AuthContext)
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
 }
