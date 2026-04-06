@@ -34,6 +34,8 @@ export function AuthProvider({ children }) {
         data: {
           full_name: name,
         },
+        // Redirect here after the user clicks the confirmation email link
+        emailRedirectTo: `${window.location.origin}/login`,
       },
     })
     return { data, error }
@@ -52,9 +54,31 @@ export function AuthProvider({ children }) {
     return { error }
   }
 
+  // Safety: if Supabase hangs (e.g. bad key), stop loading after 5s
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 5000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: '50%',
+            border: '4px solid #dbeafe', borderTop: '4px solid #2563eb',
+            animation: 'spin 0.8s linear infinite', margin: '0 auto 12px'
+          }} />
+          <p style={{ color: '#64748b', fontSize: 14, fontFamily: 'Inter, sans-serif' }}>Loading EduMap…</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   )
 }
