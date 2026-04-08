@@ -21,7 +21,7 @@ export default function Login() {
 
   function reset() { setError(null); setSuccess(null) }
 
-  /* ─── Sign In ────────────────────────────────────────────────────────────── */
+  /* Sign In */
   async function handleSignIn(e) {
     e.preventDefault()
     reset()
@@ -68,7 +68,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-900 via-brand-700 to-sky-500 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-sky-700 flex items-center justify-center p-4">
 
       {/* Decorative blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
