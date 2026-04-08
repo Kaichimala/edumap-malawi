@@ -45,7 +45,7 @@ export default function Navbar({ level, setLevel }) {
       </div>
 
       {/* User Greeting & Sign Out */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 ml-auto">
         {user && (
           <div className="hidden sm:flex flex-col items-end mr-1">
             <span className="text-xs font-semibold text-white">
