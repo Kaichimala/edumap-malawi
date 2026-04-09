@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
 import { 
   HiOutlineViewGrid, 
   HiOutlineMap, 
@@ -6,7 +7,8 @@ import {
   HiOutlineOfficeBuilding, 
   HiOutlineLocationMarker, 
   HiOutlineDocumentText, 
-  HiOutlineCog 
+  HiOutlineCog,
+  HiOutlineLogout
 } from 'react-icons/hi'
 
 const NAV_ITEMS = [
@@ -19,6 +21,14 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar() {
+  const { signOut } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await signOut()
+    navigate('/login')
+  }
+
   return (
     <div className="w-72 bg-[#1a252f] text-slate-300 h-full flex flex-col shadow-2xl z-20">
       {/* Branding */}
@@ -52,7 +62,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom Section */}
-      <div className="p-4 border-t border-slate-700/50">
+      <div className="p-4 border-t border-slate-700/50 space-y-2">
         <NavLink
             to="/settings"
             className={({ isActive }) => `
@@ -65,8 +75,16 @@ export default function Sidebar() {
             <HiOutlineCog className="w-5 h-5 transition-transform group-hover:rotate-45" />
             <span className="font-semibold text-sm">Settings</span>
           </NavLink>
+
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-red-500/10 hover:text-red-400 text-slate-400 group"
+        >
+          <HiOutlineLogout className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+          <span className="font-semibold text-sm">Sign Out</span>
+        </button>
         
-        <div className="mt-6 px-4 py-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
+        <div className="mt-4 px-4 py-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
           <div className="flex items-center gap-2 mb-2">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">MIS SYNC: ACTIVE</span>
