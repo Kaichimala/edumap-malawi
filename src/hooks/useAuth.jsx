@@ -40,20 +40,32 @@ export function AuthProvider({ children }) {
   }
 
   async function signIn(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    return { data, error }
+    // Mock authentication for development
+    if (email && password) {
+      const mockUser = { id: '1', email, user_metadata: { full_name: 'Admin User' } };
+      setUser(mockUser)
+      setSession({ user: mockUser })
+      return { data: { user: mockUser }, error: null }
+    }
+    return { data: null, error: { message: 'Invalid credentials' } }
   }
 
   async function signOut() {
-    const { error } = await supabase.auth.signOut()
-    return { error }
+    setUser(null)
+    setSession(null)
+    return { error: null }
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      session, 
+      user, 
+      isAuthenticated: !!user,
+      loading, 
+      signIn, 
+      signUp, 
+      signOut 
+    }}>
       {!loading && children}
     </AuthContext.Provider>
   )
