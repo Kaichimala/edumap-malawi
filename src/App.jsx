@@ -9,6 +9,7 @@ import DistrictsPage from './pages/DistrictsPage'
 import SchoolsPage from './pages/SchoolsPage'
 import SitesPage from './pages/SitesPage'
 import ReportsPage from './pages/ReportsPage'
+import SettingsPage from './pages/SettingsPage'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/schools" element={<SchoolsPage />} />
             <Route path="/sites" element={<SitesPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
