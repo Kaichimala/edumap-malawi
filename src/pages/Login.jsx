@@ -37,7 +37,7 @@ export default function Login() {
     }
   }
 
-  /* ─── Sign Up ────────────────────────────────────────────────────────────── */
+  /*Signup */
   async function handleSignUp(e) {
     e.preventDefault()
     reset()
