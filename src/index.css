@@ -1,3 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background-color: #f8fafc;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Smooth scroll & selection color */
+* {
+  scroll-behavior: smooth;
+  box-sizing: border-box;
+}
+
+::selection {
+  background-color: #bfdbfe;
+  color: #0f2d5c;
+}
+
+/* Leaflet popup polish */
+.leaflet-popup-content-wrapper {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 4px 24px 0 rgba(15, 45, 92, 0.13) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content {
+  margin: 0 !important;
+}
+.leaflet-popup-tip {
+  background: white !important;
+}
