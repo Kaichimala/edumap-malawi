@@ -39,8 +39,8 @@ export function getInstitutionsLevel(inst) {
 }
 
 export function getSuitabilityLevel(score) {
-  if (score >= 80) return { label: 'Excellent', color: '#166534' }
-  if (score >= 60) return { label: 'Good',      color: '#22c55e' }
-  if (score >= 40) return { label: 'Fair',      color: '#86efac' }
-  return                  { label: 'Poor',      color: '#dcfce7' }
+  if (score >= 80) return { label: 'Excellent', color: '#dc2626' }
+  if (score >= 60) return { label: 'Good',      color: '#ea580c' }
+  if (score >= 40) return { label: 'Fair',      color: '#ca8a04' }
+  return                  { label: 'Poor',      color: '#16a34a' }
 }

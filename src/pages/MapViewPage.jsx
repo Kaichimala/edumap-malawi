@@ -1,4 +1,4 @@
-import MapView from '../components/Map/MapView'
+import MapView from '../components/Map/MapView.tsx'
 import MapDistrictSidebar from '../components/Map/MapDistrictSidebar'
 import DetailPanel from '../components/DetailPanel/DetailPanel'
 import { useDistricts } from '../hooks/useDistricts'
@@ -9,15 +9,27 @@ export default function MapViewPage() {
   const { districts, loading } = useDistricts()
   const [selectedDistrict, setSelectedDistrict] = useState(null)
   const [level, setLevel] = useState('primary')
-  const [isAnalyzed, setIsAnalyzed] = useState(false)
+  
+  // Persist session analysis state
+  const [isAnalyzed, setIsAnalyzed] = useState(() => {
+    return sessionStorage.getItem('edumap_is_analyzed_map') === 'true'
+  })
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [progress, setProgress] = useState(0)
+
+  // Shared state for Build Mode and Visibility
+  const [isBuildMode, setIsBuildMode] = useState(false)
+  const [isDestroyMode, setIsDestroyMode] = useState(false)
+  const [showSites, setShowSites] = useState(true)
+
+  useEffect(() => {
+    sessionStorage.setItem('edumap_is_analyzed_map', isAnalyzed)
+  }, [isAnalyzed])
 
   const handleStartAnalysis = () => {
     setIsAnalyzing(true)
     setProgress(0)
     
-    // Simulated multi-stage analysis progress
     const duration = 2500
     const interval = 50
     const steps = duration / interval
@@ -33,6 +45,7 @@ export default function MapViewPage() {
         setTimeout(() => {
           setIsAnalyzing(false)
           setIsAnalyzed(true)
+          setShowSites(true)
         }, 300)
       }
     }, interval)
@@ -43,12 +56,22 @@ export default function MapViewPage() {
   return (
     <div className="h-[calc(100vh-10rem)] flex bg-white rounded-2xl shadow-2xl shadow-slate-200/50 overflow-hidden border border-slate-100 relative">
       
-      {/* Left Panel: District List */}
+      {/* Left Panel: District List, Planning Tools & Analytical Engine */}
       <MapDistrictSidebar 
         districts={districts}
         level={level}
         selectedDistrict={selectedDistrict}
         onSelect={setSelectedDistrict}
+        isBuildMode={isBuildMode}
+        setIsBuildMode={setIsBuildMode}
+        isDestroyMode={isDestroyMode}
+        setIsDestroyMode={setIsDestroyMode}
+        isAnalyzed={isAnalyzed}
+        isAnalyzing={isAnalyzing}
+        progress={progress}
+        handleStartAnalysis={handleStartAnalysis}
+        showSites={showSites}
+        setShowSites={setShowSites}
       />
 
       {/* Center: Map */}
@@ -73,7 +96,13 @@ export default function MapViewPage() {
           selectedDistrict={selectedDistrict}
           level={level}
           onSelect={setSelectedDistrict}
-          showMarkers={isAnalyzed}
+          showMarkers={true}
+          showSites={showSites}
+          isBuildMode={isBuildMode}
+          setIsBuildMode={setIsBuildMode}
+          isDestroyMode={isDestroyMode}
+          setIsDestroyMode={setIsDestroyMode}
+          isAnalyzed={isAnalyzed}
         />
 
         {/* Spatial Analysis floating button — always visible */}

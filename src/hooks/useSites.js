@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react'
 
-const generateMockSites = (districtId, level) => {
+const dist = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+const generateMockSites = (districtId, level, existingSchools = []) => {
   const seed = parseInt(districtId, 10) * 20 || 2;
   const count = 4;
   const sites = [];
@@ -12,24 +23,45 @@ const generateMockSites = (districtId, level) => {
   const center = coords[districtId] || [-13.9, 33.7];
 
   for (let i = 0; i < count; i++) {
+    const lat = center[0] + (Math.cos(i * 2.1) * 0.2);
+    const lng = center[1] + (Math.sin(i * 2.1) * 0.2);
+    
+    let penalty = 0;
+    existingSchools.forEach(s => {
+      const d = dist(lat, lng, s.lat, s.lng);
+      if (d < 5) {
+        const weight = s.isUserAdded ? (s.students / 400) : 1;
+        penalty += (5 - d) * 10 * weight;
+      }
+    });
+
+    const baseScore = 95 - (i * 8);
+    const finalScore = Math.max(0, Math.min(100, baseScore - penalty));
+
     sites.push({
       id: seed + i,
       district_id: districtId,
       name: `Proposed ${level.charAt(0).toUpperCase() + level.slice(1)} Site ${i + 1}`,
-      lat: center[0] + (Math.cos(i * 2.1) * 0.2),
-      lng: center[1] + (Math.sin(i * 2.1) * 0.2),
+      lat,
+      lng,
       level: level,
-      suitability_score: 95 - (i * 8),
-      reason: "High population density, far from existing facilities."
+      suitability_score: Math.round(finalScore),
+      reason: penalty > 20 ? "Low suitability due to nearby facilities." : "High population density, far from existing facilities."
     });
   }
   return sites;
 };
 
-export function useSites(districtId, level) {
+// Static default empty array to avoid infinite render loops
+const EMPTY_ARRAY = [];
+
+export function useSites(districtId, level, schools = EMPTY_ARRAY) {
   const [sites, setSites] = useState([])
   const [loading, setLoading] = useState(false)
 
+  // Use JSON.stringify for schools to detect actual contents changes if needed, 
+  // or just ensure schools reference is stable.
+  // Actually, using EMPTY_ARRAY is enough for callers that don't pass anything.
   useEffect(() => {
     if (!districtId) {
       setSites([]);
@@ -37,11 +69,11 @@ export function useSites(districtId, level) {
     }
     setLoading(true)
     const timeout = setTimeout(() => {
-      setSites(generateMockSites(districtId, level))
+      setSites(generateMockSites(districtId, level, schools))
       setLoading(false)
     }, 400)
     return () => clearTimeout(timeout)
-  }, [districtId, level])
+  }, [districtId, level, schools])
 
   return { sites, loading }
 }
