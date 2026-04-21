@@ -18,10 +18,10 @@ const LEGEND_ITEMS = {
     { label: '≤ 25',   color: '#f3e8ff' },
   ],
   suitability: [
-    { label: 'Excellent (≥80)', color: '#166534' },
-    { label: 'Good (60–79)',    color: '#22c55e' },
-    { label: 'Fair (40–59)',    color: '#86efac' },
-    { label: 'Poor (<40)',      color: '#dcfce7' },
+    { label: 'High priority (≥80)', color: '#dc2626' },
+    { label: 'Feasible (60–79)',    color: '#ea580c' },
+    { label: 'Moderate (40–59)',    color: '#ca8a04' },
+    { label: 'Low (<40)',           color: '#16a34a' },
   ],
 }
 

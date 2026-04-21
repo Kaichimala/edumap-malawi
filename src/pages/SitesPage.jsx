@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDistricts } from '../hooks/useDistricts'
 import { useSites } from '../hooks/useSites'
 import { HiOutlineLocationMarker, HiOutlineDatabase, HiOutlineChevronRight } from 'react-icons/hi'
@@ -9,9 +9,16 @@ export default function SitesPage() {
   const [level, setLevel] = useState('primary')
   const { sites, loading } = useSites(selectedDistrictId || null, level)
   
-  const [isAnalyzed, setIsAnalyzed] = useState(false)
+  // Persist session analysis state
+  const [isAnalyzed, setIsAnalyzed] = useState(() => {
+    return sessionStorage.getItem('edumap_is_analyzed_sites') === 'true'
+  })
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState(0)
+
+  useEffect(() => {
+    sessionStorage.setItem('edumap_is_analyzed_sites', isAnalyzed)
+  }, [isAnalyzed])
 
   const handleStartAnalysis = () => {
     if (!selectedDistrictId) return
@@ -36,15 +43,6 @@ export default function SitesPage() {
       }
     }, interval)
   }
-
-  // Reset analysis if district changes? 
-  // User says "NO RE RUN NEEDED", but that might mean for the map levels.
-  // For SitesPage, selecting a NEW district should probably require a new analysis?
-  // Actually, I'll keep it as "analyzed" once per session as per the "no re-run" hint, 
-  // but usually a new district needs new logic. 
-  // Wait, "NO RE RUN NEEDED" was specifically about "switch between school levels".
-  // I'll keep isAnalyzed true once set, but if they change district, it might feel weird.
-  // I'll stick to what the user said: "NO RE RUN NEEDED".
 
   return (
     <div className="space-y-6">
@@ -110,7 +108,7 @@ export default function SitesPage() {
             <div className="max-w-md space-y-3">
               <h3 className="text-2xl font-black text-slate-800">Ready for Site Prioritization</h3>
               <p className="text-slate-500 text-sm leading-relaxed">
-                Unlock the suitability matrix for {districts.find(d => d.id === selectedDistrictId)?.name || 'the selected district'}. 
+                Unlock the suitability matrix for {districts.find(d => Number(d.id) === Number(selectedDistrictId))?.name || 'the selected district'}. 
                 The algorithm will evaluate multiple spatial factors to rank the most effective locations for new {level === 'tertiary' ? 'institutions' : 'schools'}.
               </p>
             </div>
@@ -130,7 +128,7 @@ export default function SitesPage() {
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Site ID</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Suitability Score</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Analysis ID</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Rationale</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Status</th>
                 </tr>
@@ -140,15 +138,9 @@ export default function SitesPage() {
                   <tr key={s.id} className="hover:bg-slate-50 transition-colors cursor-pointer">
                     <td className="px-6 py-4 text-sm font-mono text-slate-600">#{s.id}</td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-2 bg-slate-100 rounded-full max-w-[100px] overflow-hidden">
-                          <div 
-                            className="h-full bg-green-500 transition-all duration-1000" 
-                            style={{ width: `${s.suitability_score}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-bold text-slate-700">{s.suitability_score}%</span>
-                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Validated Site
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600 leading-relaxed italic">"{s.reason}"</td>
                     <td className="px-6 py-4">

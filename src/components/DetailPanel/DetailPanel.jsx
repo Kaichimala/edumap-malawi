@@ -3,9 +3,7 @@ import { HiOutlineUsers, HiOutlineOfficeBuilding, HiOutlineChartBar, HiOutlineLo
 import { IoClose } from 'react-icons/io5'
 
 const STAT_ICONS = {
-  pop:   <HiOutlineUsers          className="w-5 h-5 text-brand-500" />,
   inst:  <HiOutlineOfficeBuilding className="w-5 h-5 text-brand-500" />,
-  score: <HiOutlineChartBar       className="w-5 h-5 text-brand-500" />,
   site:  <HiOutlineLocationMarker className="w-5 h-5 text-red-500"   />,
 }
 
@@ -22,18 +20,15 @@ export default function DetailPanel({ district, level, onClose }) {
   return (
     <div className="w-80 bg-white h-full overflow-y-auto border-l border-slate-200 shadow-xl flex flex-col">
 
-      {/* Accent bar */}
-      <div className="h-1.5 w-full" style={{ backgroundColor: need.color }} />
+      {/* Accent bar shifted to neutral */}
+      <div className="h-1.5 w-full bg-slate-200" />
 
       {/* Title row */}
       <div className="flex justify-between items-start px-5 pt-5 pb-4">
         <div>
           <h2 className="font-bold text-brand-900 text-lg leading-tight">{district.name}</h2>
-          <span
-            className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold text-white"
-            style={{ backgroundColor: need.color }}
-          >
-            {need.label} Need
+          <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold text-slate-500 bg-slate-100">
+            Active Planning
           </span>
         </div>
         <button
@@ -46,19 +41,12 @@ export default function DetailPanel({ district, level, onClose }) {
 
       {/* Stats */}
       <div className="px-5 pb-5 space-y-3">
-        <StatCard icon={STAT_ICONS.pop}   label="Age-Group Population" value={pop.toLocaleString()} />
         <StatCard icon={STAT_ICONS.inst}  label={`Existing ${instLabel}`} value={inst} />
-        <StatCard
-          icon={STAT_ICONS.score}
-          label="Need Score"
-          value={`${score.toFixed(1)} / 100`}
-          highlight={need.color}
-        />
         <StatCard
           icon={STAT_ICONS.site}
           label={`Recommended New ${instLabel}`}
           value={newInst === 0 ? 'Sufficient' : `+${newInst}`}
-          highlight={newInst > 0 ? need.color : '#16a34a'}
+          highlight={newInst > 0 ? '#1a5276' : '#16a34a'}
         />
       </div>
 

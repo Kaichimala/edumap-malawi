@@ -41,17 +41,17 @@ export default function Dashboard() {
     <div className="space-y-8 pb-12">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Schools" value={totalSchools.toLocaleString()} subValue="P: 2.1k | S: 840 | T: 24" icon="🏫" />
-        <StatCard title="Total Districts" value={totalDistricts} subValue={`${criticalDistricts.length} Critical Need`} icon="🇲🇼" />
-        <StatCard title="Population Coverage" value="68.4%" subValue="+2.1% from last year" icon="👥" color="text-green-600" />
-        <StatCard title="Recommended Sites" value="142" subValue="48 Priority-1 Sites" icon="📍" />
+        <StatCard title="Total Schools" value={totalSchools.toLocaleString()} subValue="Facility Inventory" icon="🏫" />
+        <StatCard title="Total Districts" value={totalDistricts} subValue="Administrative Units" icon="🇲🇼" />
+        <StatCard title="Population Coverage" value="68.4%" subValue="Service Area Mapping" icon="👥" color="text-green-600" />
+        <StatCard title="Recommended Sites" value="142" subValue="Planning Pointers" icon="📍" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Bar Chart Section */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-slate-800">Need Score by District (Top 10)</h3>
+            <h3 className="font-bold text-slate-800">School Distribution by District (Top 10)</h3>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Primary Level</span>
           </div>
           <div className="h-80">
@@ -109,7 +109,7 @@ export default function Dashboard() {
               <div key={d.id} className="flex items-center justify-between p-4 bg-red-50/50 rounded-xl border border-red-100">
                 <div>
                   <h4 className="font-bold text-slate-800">{d.name}</h4>
-                  <p className="text-xs text-slate-500">Need Score: <span className="text-red-600 font-bold">{calcScore(d.p_age_pop, d.p_schools, 'primary').toFixed(1)}</span></p>
+                  <p className="text-xs text-slate-500">Planning Status: <span className="text-blue-600 font-bold">Active</span></p>
                 </div>
                 <button 
                   onClick={() => navigate('/map')}

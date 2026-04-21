@@ -1,8 +1,24 @@
 import { useState } from 'react'
 import { calcScore, getNeedLevel } from '../../utils/scoring'
-import { HiOutlineSearch, HiOutlineChevronRight } from 'react-icons/hi'
+import { HiOutlineSearch, HiOutlineChevronRight, HiOutlineChartBar, HiOutlineCheckCircle, HiOutlineEye, HiOutlineEyeOff, HiOutlineTrash } from 'react-icons/hi'
+import { MdConstruction } from 'react-icons/md'
 
-export default function MapDistrictSidebar({ districts, level, onSelect, selectedDistrict }) {
+export default function MapDistrictSidebar({ 
+  districts, 
+  level, 
+  onSelect, 
+  selectedDistrict, 
+  isBuildMode, 
+  setIsBuildMode,
+  isAnalyzed,
+  isAnalyzing,
+  progress,
+  handleStartAnalysis,
+  showSites,
+  setShowSites,
+  isDestroyMode,
+  setIsDestroyMode
+}) {
   const [search, setSearch] = useState('')
 
   const filteredDistricts = districts.filter(d => 
@@ -15,7 +31,7 @@ export default function MapDistrictSidebar({ districts, level, onSelect, selecte
       <div className="p-4 border-b border-slate-100 space-y-4">
         <div>
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">District Selection</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Global Needs Assessment</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Administrative District List</p>
         </div>
 
         {/* Search */}
@@ -28,6 +44,116 @@ export default function MapDistrictSidebar({ districts, level, onSelect, selecte
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#1a5276]/20 focus:bg-white focus:border-[#1a5276] transition-all"
           />
+        </div>
+      </div>
+
+      {/* Analytical Engine Section */}
+      <div className="p-4 bg-slate-50/80 border-b border-slate-100 space-y-3">
+        <div className="flex justify-between items-center">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Spatial Engine</h3>
+          {isAnalyzed && (
+            <button
+              onClick={() => setShowSites(!showSites)}
+              className={`p-1 rounded-md transition-colors ${showSites ? 'text-[#1a5276] hover:bg-blue-50' : 'text-slate-400 hover:bg-slate-100'}`}
+            >
+              {showSites ? <HiOutlineEye className="w-4 h-4" /> : <HiOutlineEyeOff className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
+        
+        {isAnalyzing ? (
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px] font-bold text-[#1a5276] uppercase tracking-tighter">
+              <span>{progress < 100 ? 'Processing...' : 'Complete'}</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-[#1a5276] transition-all duration-300" 
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        ) : isAnalyzed ? (
+          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-[#1a5276] rounded-lg border border-blue-100">
+            <HiOutlineCheckCircle className="text-xl shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-tight leading-none">Dataset Calibrated</p>
+              <p className="text-[9px] font-medium opacity-80 mt-0.5 truncate">Planning sites ready</p>
+            </div>
+            <button 
+              onClick={handleStartAnalysis} 
+              className="text-[9px] font-bold text-[#1a5276] hover:underline"
+            >
+              Re-run
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleStartAnalysis}
+            className="w-full py-2.5 bg-[#1a5276] text-white text-[11px] font-black rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2 active:scale-95 uppercase tracking-wider"
+          >
+            <HiOutlineChartBar className="text-lg" />
+            Run Analysis
+          </button>
+        )}
+      </div>
+
+      {/* Planning Tools Section */}
+      <div className="p-4 bg-slate-50/50 border-b border-slate-100">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Planning Tools</h3>
+          {isBuildMode && <span className="text-[8px] bg-red-100 text-red-600 px-1 rounded font-black animate-pulse">BUILD MODE</span>}
+          {isDestroyMode && <span className="text-[8px] bg-red-100 text-red-600 px-1 rounded font-black animate-pulse">DESTROY MODE</span>}
+        </div>
+        <div className="space-y-2">
+          <button
+            onClick={() => {
+              setIsBuildMode(!isBuildMode)
+              if (!isBuildMode) setIsDestroyMode(false)
+            }}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${
+              isBuildMode 
+                ? 'bg-amber-600 border-amber-700 text-white shadow-lg scale-[1.02]' 
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
+            }`}
+          >
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${
+              isBuildMode ? 'bg-white/20' : 'bg-amber-50 text-amber-600'
+            }`}>
+              <MdConstruction />
+            </div>
+            <div className="text-left">
+              <p className="text-xs font-bold leading-tight">Build School</p>
+              <p className={`text-[9px] font-medium ${isBuildMode ? 'text-amber-100' : 'text-slate-400'}`}>
+                {isBuildMode ? 'Click map to place spot' : 'New Infrastructure mode'}
+              </p>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => {
+              setIsDestroyMode(!isDestroyMode)
+              if (!isDestroyMode) setIsBuildMode(false)
+            }}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${
+              isDestroyMode 
+                ? 'bg-red-600 border-red-700 text-white shadow-lg scale-[1.02]' 
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95'
+            }`}
+          >
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-colors ${
+              isDestroyMode ? 'bg-white/20' : 'bg-red-50 text-red-600'
+            }`}>
+              <HiOutlineTrash />
+            </div>
+            <div className="text-left">
+              <p className="text-xs font-bold leading-tight">Destroy School</p>
+              <p className={`text-[9px] font-medium ${isDestroyMode ? 'text-red-100' : 'text-slate-400'}`}>
+                {isDestroyMode ? 'Search to remove' : 'Remove Infrastructure'}
+              </p>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -48,16 +174,13 @@ export default function MapDistrictSidebar({ districts, level, onSelect, selecte
                   : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-100'
               }`}
             >
-              <span 
-                className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" 
-                style={{ backgroundColor: need.color }} 
-              />
+              <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm bg-blue-400" />
               <div className="flex-1 text-left min-w-0">
                 <p className={`text-xs font-bold truncate ${isSelected ? 'text-[#1a5276]' : 'text-slate-700'}`}>
                   {d.name}
                 </p>
                 <p className="text-[10px] text-slate-400 font-medium truncate uppercase tracking-tighter">
-                  {need.label} Need · Score {score.toFixed(0)}
+                  District Metadata Active
                 </p>
               </div>
               <HiOutlineChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-[#1a5276] translate-x-1' : 'text-slate-300'}`} />
