@@ -24,4 +24,6 @@ dist-ssr
 *.sw?
 
 # en file
+data_import/
+
 *.env

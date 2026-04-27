@@ -46,7 +46,7 @@ export default function DetailPanel({ district, level, onClose }) {
 
       {/* Stats */}
       <div className="px-5 pb-5 space-y-3">
-        <StatCard icon={STAT_ICONS.pop}   label="Age-Group Population" value={pop.toLocaleString()} />
+        <StatCard icon={STAT_ICONS.pop}   label="Total Population" value={district.total_pop ? district.total_pop.toLocaleString() : (district.p_age_pop + district.s_age_pop + district.t_age_pop).toLocaleString()} />
         <StatCard icon={STAT_ICONS.inst}  label={`Existing ${instLabel}`} value={inst} />
         <StatCard
           icon={STAT_ICONS.score}

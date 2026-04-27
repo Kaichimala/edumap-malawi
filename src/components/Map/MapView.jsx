@@ -1,22 +1,93 @@
 // @ts-nocheck
-import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from 'react-leaflet'
+import { useEffect, useState } from 'react'
+import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, GeoJSON } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { getNeedLevel, calcScore } from '../../utils/scoring'
 
 // Fly map to selected district
 function FlyTo({ district }) {
   const map = useMap()
-  if (district) map.flyTo([district.lat, district.lng], 9, { duration: 1.2 })
+  useEffect(() => {
+    if (district) {
+      map.flyTo([district.lat, district.lng], 9, { duration: 1.2 })
+    } else {
+      map.flyTo([-13.25, 34.30], 7, { duration: 1.2 })
+    }
+  }, [district, map])
   return null
+}
+
+function MalawiMask() {
+  const [maskData, setMaskData] = useState(null)
+
+  useEffect(() => {
+    fetch('https://raw.githubusercontent.com/wmgeolab/geoBoundaries/main/releaseData/gbOpen/MWI/ADM0/geoBoundaries-MWI-ADM0_simplified.geojson')
+      .then(res => res.json())
+      .then(data => {
+        if (data.features && data.features.length > 0) {
+          const geometry = data.features[0].geometry;
+          let holes = [];
+          if (geometry.type === 'Polygon') {
+            holes = geometry.coordinates;
+          } else if (geometry.type === 'MultiPolygon') {
+            holes = geometry.coordinates.flat(1);
+          }
+
+          const invertedPolygon = {
+            type: "FeatureCollection",
+            features: [
+              {
+                type: "Feature",
+                geometry: {
+                  type: "Polygon",
+                  coordinates: [
+                    [
+                      [-180, -90],
+                      [180, -90],
+                      [180, 90],
+                      [-180, 90],
+                      [-180, -90]
+                    ],
+                    ...holes
+                  ]
+                },
+                properties: {}
+              }
+            ]
+          };
+          setMaskData(invertedPolygon);
+        }
+      })
+      .catch(err => console.error("Error fetching Malawi GeoJSON", err))
+  }, [])
+
+  if (!maskData) return null;
+
+  return (
+    <GeoJSON
+      data={maskData}
+      style={{
+        fillColor: '#000',
+        fillOpacity: 0.4,
+        color: 'transparent',
+        weight: 0
+      }}
+      interactive={false}
+    />
+  )
 }
 
 export default function MapView({ districts, selectedDistrict, level, onSelect, showMarkers }) {
   return (
     <MapContainer
-      center={[-13.5, 34.3]}
-      zoom={6}
+      center={[-13.25, 34.30]}
+      zoom={7}
+      minZoom={6}
+      maxBounds={[[-17.15, 32.60], [-9.35, 36.00]]}
+      maxBoundsViscosity={1.0}
       style={{ height: '100%', width: '100%' }}
     >
+      <MalawiMask />
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='© OpenStreetMap'

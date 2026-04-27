@@ -40,20 +40,18 @@ export function AuthProvider({ children }) {
   }
 
   async function signIn(email, password) {
-    // Mock authentication for development
-    if (email && password) {
-      const mockUser = { id: '1', email, user_metadata: { full_name: 'Admin User' } };
-      setUser(mockUser)
-      setSession({ user: mockUser })
-      return { data: { user: mockUser }, error: null }
-    }
-    return { data: null, error: { message: 'Invalid credentials' } }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { data, error }
   }
 
   async function signOut() {
+    const { error } = await supabase.auth.signOut()
     setUser(null)
     setSession(null)
-    return { error: null }
+    return { error }
   }
 
   return (
