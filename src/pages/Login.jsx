@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuthHook'
+import { useAuth } from '../hooks/useAuth'
 import { MdErrorOutline, MdWarningAmber } from 'react-icons/md'
 import { LuEye, LuEyeOff } from 'react-icons/lu'
 import { AiOutlineLoading3Quarters } from 'react-icons/ai'
