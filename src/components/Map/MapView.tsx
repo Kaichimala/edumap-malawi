@@ -1,13 +1,18 @@
 // @ts-nocheck
-import { useState } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import { useRef, useState } from 'react'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 import { getNeedLevel, calcScore, getPopulationLevel, getInstitutionsLevel, getSuitabilityLevel } from '../../utils/scoring'
 import MapLegend from './MapLegend'
 import LayerToggle from './LayerToggle'
 import { useSchools } from '../../hooks/useSchools'
 import { useSites } from '../../hooks/useSites'
+import { HiDownload } from 'react-icons/hi'
+import { LuFileImage } from 'react-icons/lu'
+import { FaFilePdf } from 'react-icons/fa'
 
 // Red pin icon for recommended sites
 const redPinIcon = new L.Icon({
@@ -33,13 +38,105 @@ function FlyTo({ district }) {
 
 export default function MapView({ districts, selectedDistrict, level = 'primary', onSelect }) {
   const [layerMode, setLayerMode] = useState('need')
+  const [exportLoading, setExportLoading] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const mapRef = useRef(null)
+  
   const { schools } = useSchools(selectedDistrict?.id)
   const { sites }   = useSites(selectedDistrict?.id, level)
 
+  const handleExport = async (format) => {
+    if (!mapRef.current) return
+    setExportLoading(true)
+    setShowExportMenu(false)
+    
+    try {
+      // Small delay to ensure any hover effects or menus are cleared
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      const canvas = await html2canvas(mapRef.current, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#f8fafc',
+        scale: 2, // Higher quality
+        ignoreElements: (element) => {
+          // Ignore the export button itself during capture
+          return element.classList.contains('export-ignore')
+        }
+      })
+
+      const timestamp = new Date().toISOString().split('T')[0]
+      const filename = `edumap-analysis-${timestamp}`
+
+      if (format === 'png') {
+        const link = document.createElement('a')
+        link.download = `${filename}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+      } else if (format === 'pdf') {
+        const imgData = canvas.toDataURL('image/png')
+        const pdf = new jsPDF({
+          orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [canvas.width, canvas.height]
+        })
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height)
+        pdf.save(`${filename}.pdf`)
+      }
+    } catch (err) {
+      console.error('Export failed:', err)
+      alert('Failed to export map. Please try again.')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   return (
-    <div className="relative w-full h-full">
+    <div ref={mapRef} className="relative w-full h-full bg-slate-50">
       <LayerToggle mode={layerMode} setMode={setLayerMode} />
       <MapLegend mode={layerMode} />
+
+      {/* Export Button Overlay */}
+      <div className="absolute bottom-6 right-6 z-[500] flex flex-col items-end gap-2 export-ignore">
+        {showExportMenu && (
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden mb-2 transition-all">
+            <button 
+              onClick={() => handleExport('png')}
+              className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 w-full text-left transition-colors"
+            >
+              <LuFileImage className="text-blue-500 w-5 h-5" />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold">Export as PNG</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">High Resolution Image</span>
+              </div>
+            </button>
+            <div className="h-px bg-slate-100 mx-2" />
+            <button 
+              onClick={() => handleExport('pdf')}
+              className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 w-full text-left transition-colors"
+            >
+              <FaFilePdf className="text-red-500 w-5 h-5" />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold">Export as PDF</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Document for Reports</span>
+              </div>
+            </button>
+          </div>
+        )}
+        
+        <button
+          onClick={() => setShowExportMenu(!showExportMenu)}
+          disabled={exportLoading}
+          className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none group"
+        >
+          {exportLoading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <HiDownload className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+          )}
+          <span className="font-semibold text-sm">Export Analysis</span>
+        </button>
+      </div>
 
       <MapContainer
         center={[-13.5, 34.3]}

@@ -4,7 +4,7 @@ import { TbMapRoute } from 'react-icons/tb'
 import { LuLogOut } from 'react-icons/lu'
 
 export default function Navbar({ level, setLevel }) {
-  const { signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const navigate = useNavigate()
 
   async function handleSignOut() {
@@ -44,17 +44,26 @@ export default function Navbar({ level, setLevel }) {
         ))}
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Sign Out */}
-      <button
-        onClick={handleSignOut}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-brand-200 hover:bg-white/10 hover:text-white transition-colors"
-      >
-        <LuLogOut className="w-4 h-4" />
-        Sign Out
-      </button>
+      {/* User Greeting & Sign Out */}
+      <div className="flex items-center gap-4 ml-auto">
+        {user && (
+          <div className="hidden sm:flex flex-col items-end">
+            <span className="text-xs font-semibold text-white">
+              {user.user_metadata?.full_name || user.email?.split('@')[0]}
+            </span>
+            <span className="text-[10px] text-brand-300">
+              {user.email}
+            </span>
+          </div>
+        )}
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-brand-200 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <LuLogOut className="w-4 h-4" />
+          Sign Out
+        </button>
+      </div>
     </nav>
   )
 }
