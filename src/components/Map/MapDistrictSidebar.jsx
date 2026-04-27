@@ -1,0 +1,130 @@
+import { useState } from 'react'
+import { calcScore, getNeedLevel } from '../../utils/scoring'
+import { HiOutlineSearch, HiOutlineChevronRight, HiOutlineSparkles, HiOutlineRefresh } from 'react-icons/hi'
+
+export default function MapDistrictSidebar({
+  districts, level, onSelect, selectedDistrict,
+  criteria, onCriteriaChange, onRerun, suitabilityLoading
+}) {
+  const [search, setSearch] = useState('')
+
+  const filteredDistricts = districts.filter(d =>
+    d.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const CRITERIA_LABELS = {
+    road_weight: 'Road Access',
+    river_weight: 'Water Proximity',
+    population_weight: 'Population Need',
+    slope_weight: 'Terrain Slope',
+  }
+
+  return (
+    <div className="w-72 bg-white h-full flex flex-col border-r border-slate-200">
+      {/* Header */}
+      <div className="p-4 border-b border-slate-100 space-y-4">
+        <div>
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">District Selection</h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Global Needs Assessment</p>
+        </div>
+
+        {/* Search */}
+        <div className="relative group">
+          <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1a5276] transition-colors" />
+          <input
+            type="text"
+            placeholder="Search districts..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#1a5276]/20 focus:bg-white focus:border-[#1a5276] transition-all"
+          />
+        </div>
+
+        {/* PyLUSAT Suitability Criteria */}
+        <div className="bg-slate-50 rounded-xl border border-slate-100 p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HiOutlineSparkles className="text-[#1a5276] w-4 h-4" />
+              <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-widest">PyLUSAT Weights</h3>
+            </div>
+            {/* Re-run button */}
+            {selectedDistrict && (
+              <button
+                onClick={onRerun}
+                disabled={suitabilityLoading}
+                title="Re-run analysis with new weights"
+                className="text-[#1a5276] hover:text-[#154360] disabled:opacity-40 transition-colors"
+              >
+                <HiOutlineRefresh className={`w-4 h-4 ${suitabilityLoading ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {Object.keys(criteria).map(key => (
+              <div key={key} className="flex flex-col">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                    {CRITERIA_LABELS[key]}
+                  </label>
+                  <span className="text-[9px] font-bold text-[#1a5276]">{criteria[key].toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0" max="1" step="0.1"
+                  value={criteria[key]}
+                  onChange={(e) => onCriteriaChange({ ...criteria, [key]: parseFloat(e.target.value) })}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#1a5276]"
+                />
+              </div>
+            ))}
+          </div>
+
+          {suitabilityLoading && (
+            <p className="text-[10px] text-[#1a5276] font-bold text-center animate-pulse">
+              Running PyLUSAT analysis...
+            </p>
+          )}
+          {!selectedDistrict && (
+            <p className="text-[10px] text-slate-400 text-center">Select a district to run analysis</p>
+          )}
+        </div>
+      </div>
+
+      {/* District List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {filteredDistricts.map(d => {
+          const score = calcScore(d.p_age_pop, d.p_schools, level)
+          const need = getNeedLevel(score)
+          const isSelected = selectedDistrict?.id === d.id
+
+          return (
+            <button
+              key={d.id}
+              onClick={() => onSelect(d)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${
+                isSelected
+                  ? 'bg-blue-50 border-blue-200 shadow-sm'
+                  : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-100'
+              }`}
+            >
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                style={{ backgroundColor: need.color }}
+              />
+              <div className="flex-1 text-left min-w-0">
+                <p className={`text-xs font-bold truncate ${isSelected ? 'text-[#1a5276]' : 'text-slate-700'}`}>
+                  {d.name}
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium truncate uppercase tracking-tighter">
+                  {need.label} Need · Score {score.toFixed(0)}
+                </p>
+              </div>
+              <HiOutlineChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-[#1a5276] translate-x-1' : 'text-slate-300'}`} />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

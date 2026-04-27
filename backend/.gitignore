@@ -1,0 +1,24 @@
+# Python virtual environments
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Data and large files
+data/EduMapdata/*.tif
+data/EduMapdata/*.shp
+data/EduMapdata/*.dbf
+data/EduMapdata/*.geojson
+# Alternatively, ignore the entire data directory if it's strictly for local assets
+# data/
+
+# Profile and temporary scripts
+profile_bottleneck.py
+*.tmp

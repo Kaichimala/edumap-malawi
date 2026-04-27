@@ -1,4 +1,4 @@
-import { useAuth } from '../../hooks/useAuth'
+import { useAuth } from '../../hooks/useAuthHook'
 import { useNavigate } from 'react-router-dom'
 import { TbMapRoute } from 'react-icons/tb'
 import { LuLogOut } from 'react-icons/lu'
@@ -45,9 +45,9 @@ export default function Navbar({ level, setLevel }) {
       </div>
 
       {/* User Greeting & Sign Out */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 ml-auto">
         {user && (
-          <div className="hidden sm:flex flex-col items-end mr-1">
+          <div className="hidden sm:flex flex-col items-end">
             <span className="text-xs font-semibold text-white">
               {user.user_metadata?.full_name || user.email?.split('@')[0]}
             </span>

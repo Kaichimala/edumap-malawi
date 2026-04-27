@@ -1,0 +1,57 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 1,
+        "name": "Lilongwe Site A",
+        "base_score": 60,
+        "suitability_score": 60
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [33.7878, -13.9669]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 2,
+        "name": "Blantyre Site B",
+        "base_score": 45,
+        "suitability_score": 45
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [34.9976, -15.7861]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 3,
+        "name": "Mzuzu Site C",
+        "base_score": 80,
+        "suitability_score": 80
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [34.0158, -11.4659]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 4,
+        "name": "Zomba Site D",
+        "base_score": 55,
+        "suitability_score": 55
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [35.3167, -15.3833]
+      }
+    }
+  ]
+}

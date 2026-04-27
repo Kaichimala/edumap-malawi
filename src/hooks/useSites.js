@@ -1,47 +1,89 @@
 import { useEffect, useState } from 'react'
 
-const generateMockSites = (districtId, level) => {
-  const seed = parseInt(districtId, 10) * 20 || 2;
-  const count = 4;
-  const sites = [];
-  const coords = {
-    1: [-13.9669, 33.7878], 2: [-15.7861, 34.9976], 3: [-11.4659, 34.0158],
-    4: [-15.3833, 35.3167], 5: [-13.0333, 33.4833], 6: [-14.4833, 35.2667],
-    7: [-13.7833, 34.4333], 8: [-14.3667, 34.3333]
-  };
-  const center = coords[districtId] || [-13.9, 33.7];
+const DEFAULT_WEIGHTS = {
+  road_weight:        0.5,
+  river_weight:       0.5,
+  population_weight:  0.5,
+  slope_weight:       0.5,
+}
 
-  for (let i = 0; i < count; i++) {
-    sites.push({
-      id: seed + i,
-      district_id: districtId,
-      name: `Proposed ${level.charAt(0).toUpperCase() + level.slice(1)} Site ${i + 1}`,
-      lat: center[0] + (Math.cos(i * 2.1) * 0.2),
-      lng: center[1] + (Math.sin(i * 2.1) * 0.2),
-      level: level,
-      suitability_score: 95 - (i * 8),
-      reason: "High population density, far from existing facilities."
-    });
-  }
-  return sites;
-};
-
-export function useSites(districtId, level) {
-  const [sites, setSites] = useState([])
+export function useSites(districtId, level, weights = DEFAULT_WEIGHTS) {
+  const [sites, setSites]   = useState([])
+  const [metadata, setMetadata] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError]   = useState(null)
 
   useEffect(() => {
     if (!districtId) {
-      setSites([]);
-      return;
+      setSites([])
+      setMetadata(null)
+      return
     }
-    setLoading(true)
-    const timeout = setTimeout(() => {
-      setSites(generateMockSites(districtId, level))
-      setLoading(false)
-    }, 400)
-    return () => clearTimeout(timeout)
-  }, [districtId, level])
 
-  return { sites, loading }
+    let cancelled = false
+
+    Promise.resolve().then(() => {
+      if (!cancelled) setLoading(true)
+    })
+
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/analyze-suitability`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        district_id: Number(districtId),
+        level,
+        ...weights,
+      }),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`Analysis failed: ${res.statusText}`)
+        return res.json()
+      })
+      .then(data => {
+        if (cancelled) return
+        // Extract only point features (not buffer polygons)
+        const points = (data.features || [])
+          .filter(f => f.properties?.feature_type === 'point' || !f.properties?.feature_type)
+          .map((f, i) => {
+            const p = f.properties
+            const [lng, lat] = f.geometry.coordinates
+            return {
+              id:               p.name ?? `Site ${i + 1}`,
+              rank:             i + 1,
+              lat,
+              lng,
+              suitability_score: p.suitability_score,
+              road_score:        p.road_score,
+              water_score:       p.water_score,
+              slope_score:       p.slope_score,
+              dist_road_m:       p.dist_road_m,
+              dist_water_m:      p.dist_water_m,
+              slope_deg:         p.slope_deg,
+              district:          p.district,
+              level,
+            }
+          })
+        setSites(points)
+        setMetadata(data.metadata || null)
+        setError(null)
+      })
+      .catch(err => {
+        if (!cancelled) {
+          console.error('useSites fetch failed:', err)
+          setError(err.message)
+          setSites([])
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+      setSites([])
+      setMetadata(null)
+    }
+  }, [districtId, level])      // intentionally excludes weights to avoid re-running on slider drag
+
+  return { sites, metadata, loading, error }
 }

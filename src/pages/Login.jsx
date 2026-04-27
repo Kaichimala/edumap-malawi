@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
-import { TbMapRoute } from 'react-icons/tb'
+import { useAuth } from '../hooks/useAuthHook'
 import { MdErrorOutline, MdWarningAmber } from 'react-icons/md'
 import { LuEye, LuEyeOff } from 'react-icons/lu'
 import { AiOutlineLoading3Quarters } from 'react-icons/ai'
@@ -82,8 +81,8 @@ export default function Login() {
 
           {/* ── Card Header ── */}
           <div className="bg-gradient-to-r from-brand-900 to-brand-700 px-8 pt-10 pb-8 text-white text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur rounded-2xl mb-5 border border-white/20">
-              <TbMapRoute className="w-9 h-9 text-sky-300" />
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-brand-900 rounded-2xl shadow-xl mb-6 text-white text-3xl font-black italic border border-white/10 mx-auto">
+              EM
             </div>
             <h1 className="text-2xl font-bold tracking-tight">EduMap Malawi</h1>
             <p className="text-brand-200 text-sm mt-1">Educational Planning &amp; Decision Support</p>

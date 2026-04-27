@@ -13,6 +13,7 @@ const MODES = [
 export default function LayerToggle({ mode, setMode }) {
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] bg-white/95 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-lg shadow-brand-900/10 px-2 py-2 flex gap-1">
+      {/* eslint-disable-next-line no-unused-vars */}
       {MODES.map(({ id, label, Icon }) => (
         <button
           key={id}

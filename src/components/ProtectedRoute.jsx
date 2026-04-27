@@ -1,13 +1,12 @@
 import { Navigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../hooks/useAuthHook'
 
 export default function ProtectedRoute({ children }) {
-  const { session, loading } = useAuth()
+  const { isAuthenticated, loading } = useAuth()
 
-  // Wait for auth to resolve before deciding — avoids a false redirect to /login
   if (loading) return null
 
-  if (!session) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
