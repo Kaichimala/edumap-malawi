@@ -402,7 +402,9 @@ export default function MapView({
           const score = calcScore(pop, inst, level)
           const suitability = getSuitabilityLevel(score)
           
-          const rawRadius = (pop || 0) / 5000;
+          // Fix: Use the official target ratio for the radius calculation
+          const targetRatio = level === 'primary' ? 400 : (level === 'secondary' ? 280 : 8000);
+          const rawRadius = (pop || 0) / targetRatio;
           const radius = isNaN(rawRadius) ? 12 : Math.max(12, Math.min(40, rawRadius));
 
           // Guard against invalid coordinates
