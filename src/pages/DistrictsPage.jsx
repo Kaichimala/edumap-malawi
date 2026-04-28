@@ -15,6 +15,7 @@ export default function DistrictsPage() {
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">District Name</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Primary Schools</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Secondary Schools</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Tertiary Institutions</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Need Score</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Priority Level</th>
             </tr>
@@ -29,6 +30,7 @@ export default function DistrictsPage() {
                   <td className="px-6 py-4 font-medium text-slate-900 group-hover:text-[#1a5276]">{d.name}</td>
                   <td className="px-6 py-4 text-center text-slate-600">{d.p_schools}</td>
                   <td className="px-6 py-4 text-center text-slate-600">{d.s_schools}</td>
+                  <td className="px-6 py-4 text-center text-slate-600">{d.t_institutions}</td>
                   <td className="px-6 py-4 text-center font-bold text-slate-700">{score.toFixed(1)}</td>
                   <td className="px-6 py-4">
                     <span 

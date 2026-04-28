@@ -16,7 +16,15 @@ export function useDistricts() {
 
                 if (sbError) throw sbError;
 
-                setDistricts(data || []);
+                const safeDistricts = (data || [])
+                    .map(d => ({
+                        ...d,
+                        lat: Number(d.lat),
+                        lng: Number(d.lng)
+                    }))
+                    .filter(d => !isNaN(d.lat) && !isNaN(d.lng) && d.lat !== 0 && d.lng !== 0);
+
+                setDistricts(safeDistricts);
             } catch (err) {
                 console.error("Error fetching districts:", err);
                 setError(err);

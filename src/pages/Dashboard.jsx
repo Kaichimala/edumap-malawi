@@ -15,7 +15,8 @@ export default function Dashboard() {
   const { districts, loading: dLoading } = useDistricts()
   
   // Aggregate data for stats
-  const totalSchools = districts.reduce((acc, d) => acc + (Number(d.p_schools) || 0) + (Number(d.s_schools) || 0), 0)
+  const totalSchools = districts.reduce((acc, d) => 
+    acc + (Number(d.p_schools) || 0) + (Number(d.s_schools) || 0) + (Number(d.t_institutions) || 0), 0)
   const totalDistricts = districts.length
   const criticalDistricts = districts.filter(d => calcScore(Number(d.p_age_pop) || 0, Number(d.p_schools) || 0, 'primary') >= 80)
   

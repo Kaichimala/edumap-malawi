@@ -52,6 +52,27 @@ export default function DetailPanel({ district, level, onClose }) {
 
       <div className="mx-5 border-t border-slate-100" />
 
+      {/* Level Breakdown Section */}
+      <div className="px-5 py-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">District Breakdown</p>
+        <div className="grid grid-cols-3 gap-2">
+           <div className="bg-slate-50 p-2 rounded-lg text-center border border-slate-100">
+             <div className="text-[10px] text-slate-400 uppercase font-bold">Primary</div>
+             <div className="text-sm font-bold text-slate-700">{district.p_schools}</div>
+           </div>
+           <div className="bg-slate-50 p-2 rounded-lg text-center border border-slate-100">
+             <div className="text-[10px] text-slate-400 uppercase font-bold">Secondary</div>
+             <div className="text-sm font-bold text-slate-700">{district.s_schools}</div>
+           </div>
+           <div className="bg-slate-50 p-2 rounded-lg text-center border border-slate-100">
+             <div className="text-[10px] text-slate-400 uppercase font-bold">Tertiary</div>
+             <div className="text-sm font-bold text-slate-700">{district.t_institutions}</div>
+           </div>
+        </div>
+      </div>
+
+      <div className="mx-5 border-t border-slate-100" />
+
       {/* Sites note */}
       <div className="px-5 py-4 flex-1">
         <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Sites &amp; Schools</p>

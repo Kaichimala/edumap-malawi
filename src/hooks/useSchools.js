@@ -35,7 +35,9 @@ export function useSchools(districtId) {
 
   const fetchSupabaseSchools = async (dId) => {
     try {
-      let query = supabase.from('app_schools').select('*');
+      // Query the table directly to avoid 500 errors from complex views
+      let query = supabase.from('mwi_education_edumap').select('id, name, geometry, district_id');
+      
       if (dId) {
         query = query.eq('district_id', dId);
       }
@@ -43,11 +45,31 @@ export function useSchools(districtId) {
       const { data, error } = await query;
       
       if (error) {
-        console.error("Error fetching schools from Supabase:", error);
+        console.error("Error fetching schools:", error);
         return [];
       }
-      
-      return data || [];
+
+      // Extract coordinates from GeoJSON or geometry format
+      return (data || []).map(s => {
+        let lat = 0, lng = 0;
+        if (s.geometry && typeof s.geometry === 'object') {
+          if (s.geometry.coordinates) {
+             lng = s.geometry.coordinates[0];
+             lat = s.geometry.coordinates[1];
+          }
+        }
+        
+        if (!lat || !lng) return null;
+
+        return {
+          ...s,
+          name: s.name || 'Unknown School',
+          lat: lat,
+          lng: lng,
+          level: 'primary',
+          students: 400
+        };
+      }).filter(Boolean);
     } catch (err) {
       console.error("Unexpected error fetching schools:", err);
       return [];
