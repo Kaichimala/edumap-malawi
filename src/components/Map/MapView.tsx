@@ -402,7 +402,11 @@ export default function MapView({
           const score = calcScore(pop, inst, level)
           const suitability = getSuitabilityLevel(score)
           
-          const radius = Math.max(12, Math.min(40, pop / 5000));
+          const rawRadius = (pop || 0) / 5000;
+          const radius = isNaN(rawRadius) ? 12 : Math.max(12, Math.min(40, rawRadius));
+
+          // Guard against invalid coordinates
+          if (isNaN(d.lat) || isNaN(d.lng)) return null;
 
           return (
             <CircleMarker

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { supabase } from '../lib/supabaseClient'
 
 const STORAGE_KEY = 'edumap_added_schools';
 const DELETED_KEY = 'edumap_deleted_schools';
@@ -27,52 +28,57 @@ const saveDeletedSchool = (id) => {
   }
 };
 
-const generateMockSchools = (districtId) => {
-  const seed = parseInt(districtId, 10) * 10 || 1;
-  const count = 15;
-  const schools = [];
-  const coords = {
-    1: [-13.9669, 33.7878], 2: [-15.7861, 34.9976], 3: [-11.4659, 34.0158],
-    4: [-15.3833, 35.3167], 5: [-13.0333, 33.4833], 6: [-14.4833, 35.2667],
-    7: [-13.7833, 34.4333], 8: [-14.3667, 34.3333]
-  };
-  const center = coords[districtId] || [-13.9, 33.7];
-
-  for (let i = 0; i < count; i++) {
-    schools.push({
-      id: seed + i,
-      district_id: districtId,
-      name: `School ${seed + i}`,
-      lat: center[0] + (Math.sin(i * 1.5) * 0.15),
-      lng: center[1] + (Math.cos(i * 1.5) * 0.15),
-      level: i % 2 === 0 ? 'primary' : 'secondary',
-      students: 200 + (Math.abs(Math.sin(i)) * 500)
-    });
-  }
-  return schools;
-};
-
 export function useSchools(districtId) {
   const [schools, setSchools] = useState([])
+  const [allSchools, setAllSchools] = useState([])
   const [loading, setLoading] = useState(false)
 
-  const refreshSchools = useCallback(() => {
-    if (!districtId) {
-      setSchools([]);
-      return;
+  const fetchSupabaseSchools = async (dId) => {
+    try {
+      let query = supabase.from('app_schools').select('*');
+      if (dId) {
+        query = query.eq('district_id', dId);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching schools from Supabase:", error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (err) {
+      console.error("Unexpected error fetching schools:", err);
+      return [];
     }
+  };
+
+  const refreshSchools = useCallback(async () => {
     setLoading(true)
-    const timeout = setTimeout(() => {
-      const mock = generateMockSchools(districtId);
-      const added = getAddedSchools().filter(s => String(s.district_id) === String(districtId));
-      
-      const deletedIds = getDeletedSchools();
-      const allSchools = [...mock, ...added].filter(s => !deletedIds.includes(String(s.id)) && !deletedIds.includes(s.id));
-      
-      setSchools(allSchools);
-      setLoading(false)
-    }, 400)
-    return () => clearTimeout(timeout)
+    
+    // Fetch district specific schools
+    let districtSchoolsData = [];
+    if (districtId) {
+      districtSchoolsData = await fetchSupabaseSchools(districtId);
+    }
+    
+    // Fetch all schools for searching/destroy mode
+    const allSchoolsData = await fetchSupabaseSchools(null);
+
+    const added = getAddedSchools();
+    const deletedIds = getDeletedSchools();
+    
+    // Process district schools
+    const districtAdded = added.filter(s => String(s.district_id) === String(districtId));
+    const finalDistrictSchools = [...districtSchoolsData, ...districtAdded].filter(s => !deletedIds.includes(String(s.id)) && !deletedIds.includes(s.id));
+    
+    // Process all schools
+    const finalAllSchools = [...allSchoolsData, ...added].filter(s => !deletedIds.includes(String(s.id)) && !deletedIds.includes(s.id));
+    
+    setSchools(finalDistrictSchools);
+    setAllSchools(finalAllSchools);
+    setLoading(false);
   }, [districtId])
 
   useEffect(() => {
@@ -95,15 +101,9 @@ export function useSchools(districtId) {
     refreshSchools();
   };
 
+  // MapView.tsx uses this synchronously, so we return the pre-fetched allSchools state
   const getAllSchools = () => {
-    let all = [];
-    for (let i = 1; i <= 8; i++) {
-      all = [...all, ...generateMockSchools(i)];
-    }
-    const added = getAddedSchools();
-    const deletedIds = getDeletedSchools();
-    
-    return [...all, ...added].filter(s => !deletedIds.includes(String(s.id)) && !deletedIds.includes(s.id));
+    return allSchools;
   };
 
   return { schools, loading, addSchool, removeSchool, getAllSchools }
