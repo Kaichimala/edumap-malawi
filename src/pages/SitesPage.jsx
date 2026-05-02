@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useDistricts } from '../hooks/useDistricts'
 import { useSites } from '../hooks/useSites'
 import { HiOutlineLocationMarker, HiOutlineDatabase, HiOutlineChevronRight } from 'react-icons/hi'
 

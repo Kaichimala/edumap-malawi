@@ -182,7 +182,6 @@ export default function MapViewPage() {
               const pop = level === 'primary' ? selectedDistrict?.p_age_pop : level === 'secondary' ? selectedDistrict?.s_age_pop : selectedDistrict?.t_age_pop;
               const need = getNeedLevel(calcScore(pop, siteCount, level));
               
-
               return (
                 <div className="pt-2 mt-0.5 border-t border-slate-100 space-y-2">
                    <div className="flex items-center gap-2.5">
@@ -275,4 +274,3 @@ export default function MapViewPage() {
     </div>
   )
 }
-
