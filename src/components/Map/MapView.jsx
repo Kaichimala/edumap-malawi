@@ -10,7 +10,7 @@ function FlyTo({ district }) {
   return null
 }
 
-export default function MapView({ districts, selectedDistrict, level, onSelect }) {
+export default function MapView({ districts, selectedDistrict, level, onSelect, showMarkers }) {
   return (
     <MapContainer
       center={[-13.5, 34.3]}
@@ -24,7 +24,7 @@ export default function MapView({ districts, selectedDistrict, level, onSelect }
 
       <FlyTo district={selectedDistrict} />
 
-      {districts.map(d => {
+      {showMarkers && districts.map(d => {
         const pop   = level === 'primary'   ? d.p_age_pop   :
                       level === 'secondary' ? d.s_age_pop   : d.t_age_pop
         const inst  = level === 'primary'   ? d.p_schools   :
