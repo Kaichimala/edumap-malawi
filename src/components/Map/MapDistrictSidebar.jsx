@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { calcScore, getNeedLevel } from '../../utils/scoring'
 import { HiOutlineSearch, HiOutlineChevronRight, HiOutlineChartBar, HiOutlineCheckCircle, HiOutlineEye, HiOutlineEyeOff, HiOutlineTrash } from 'react-icons/hi'
 import { MdConstruction } from 'react-icons/md'
+import { useSites } from '../../hooks/useSites'
 
 export default function MapDistrictSidebar({ 
   districts, 
@@ -11,7 +12,9 @@ export default function MapDistrictSidebar({
   isBuildMode, 
   setIsBuildMode,
   isAnalyzed,
-  onAnalysisComplete,
+  isAnalyzing,
+  progress,
+  handleStartAnalysis,
   handleClearAnalysis,
   showSites,
   setShowSites,
@@ -19,32 +22,6 @@ export default function MapDistrictSidebar({
   setIsDestroyMode
 }) {
   const [search, setSearch] = useState('')
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [progress, setProgress] = useState(0)
-
-  const handleStartAnalysis = () => {
-    setIsAnalyzing(true)
-    setProgress(0)
-    
-    const duration = 2500
-    const interval = 50
-    const steps = duration / interval
-    let currentStep = 0
-
-    const timer = setInterval(() => {
-      currentStep++
-      const p = Math.min(100, Math.round((currentStep / steps) * 100))
-      setProgress(p)
-
-      if (currentStep >= steps) {
-        clearInterval(timer)
-        setTimeout(() => {
-          setIsAnalyzing(false)
-          onAnalysisComplete()
-        }, 300)
-      }
-    }, interval)
-  }
 
   const filteredDistricts = districts.filter(d => 
     d.name.toLowerCase().includes(search.toLowerCase())
