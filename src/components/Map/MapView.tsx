@@ -331,6 +331,12 @@ export default function MapView({
       <MapContainer
         center={[-13.5, 34.3]}
         zoom={6}
+        minZoom={6}
+        maxBounds={[
+          [-17.5, 32.0], // South-West bound (Zambia/Mozambique border area)
+          [-9.0, 36.5]   // North-East bound (Tanzania border area)
+        ]}
+        maxBoundsViscosity={1.0} // Makes the boundary completely solid (no bouncing)
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%', zIndex: 0 }}
       >
