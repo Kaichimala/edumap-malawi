@@ -1,6 +1,7 @@
 import { calcScore, getNeedLevel, getRecommendedNew } from '../../utils/scoring'
 import { HiOutlineUsers, HiOutlineOfficeBuilding, HiOutlineChartBar, HiOutlineLocationMarker } from 'react-icons/hi'
 import { IoClose } from 'react-icons/io5'
+import { useSchools } from '../../hooks/useSchools'
 
 const STAT_ICONS = {
   inst:  <HiOutlineOfficeBuilding className="w-5 h-5 text-brand-500" />,
@@ -8,10 +9,17 @@ const STAT_ICONS = {
 }
 
 export default function DetailPanel({ district, level, onClose }) {
+  const { schools } = useSchools()
+  
+  // Get live counts from the actual map data instead of static district table
+  const primaryCount = (schools || []).filter(s => s.level?.toLowerCase() === 'primary').length
+  const secondaryCount = (schools || []).filter(s => s.level?.toLowerCase() === 'secondary').length
+  const tertiaryCount = (schools || []).filter(s => s.level?.toLowerCase() === 'tertiary').length
+
   const pop  = level === 'primary'   ? district.p_age_pop   :
                level === 'secondary' ? district.s_age_pop   : district.t_age_pop
-  const inst = level === 'primary'   ? district.p_schools   :
-               level === 'secondary' ? district.s_schools   : district.t_institutions
+  const inst = level === 'primary'   ? primaryCount   :
+               level === 'secondary' ? secondaryCount : tertiaryCount
   const score   = calcScore(pop, inst, level)
   const need    = getNeedLevel(score)
   const newInst = getRecommendedNew(pop, inst, level)
@@ -58,15 +66,15 @@ export default function DetailPanel({ district, level, onClose }) {
         <div className="grid grid-cols-3 gap-2">
            <div className="bg-slate-50 p-2 rounded-lg text-center border border-slate-100">
              <div className="text-[10px] text-slate-400 uppercase font-bold">Primary</div>
-             <div className="text-sm font-bold text-slate-700">{district.p_schools}</div>
+             <div className="text-sm font-bold text-slate-700">{primaryCount}</div>
            </div>
            <div className="bg-slate-50 p-2 rounded-lg text-center border border-slate-100">
              <div className="text-[10px] text-slate-400 uppercase font-bold">Secondary</div>
-             <div className="text-sm font-bold text-slate-700">{district.s_schools}</div>
+             <div className="text-sm font-bold text-slate-700">{secondaryCount}</div>
            </div>
            <div className="bg-slate-50 p-2 rounded-lg text-center border border-slate-100">
              <div className="text-[10px] text-slate-400 uppercase font-bold">Tertiary</div>
-             <div className="text-sm font-bold text-slate-700">{district.t_institutions}</div>
+             <div className="text-sm font-bold text-slate-700">{tertiaryCount}</div>
            </div>
         </div>
       </div>

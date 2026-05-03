@@ -21,8 +21,6 @@ export default function MapViewPage() {
   const [isAnalyzed, setIsAnalyzed] = useState(() => {
     return sessionStorage.getItem('edumap_is_analyzed_map') === 'true'
   })
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [progress, setProgress] = useState(0)
 
   // Shared state for Build Mode and Visibility
   const [isBuildMode, setIsBuildMode] = useState(false)
@@ -33,29 +31,14 @@ export default function MapViewPage() {
     sessionStorage.setItem('edumap_is_analyzed_map', isAnalyzed)
   }, [isAnalyzed])
 
-  const handleStartAnalysis = () => {
-    setIsAnalyzing(true)
-    setProgress(0)
-    
-    const duration = 2500
-    const interval = 50
-    const steps = duration / interval
-    let currentStep = 0
+  const handleAnalysisComplete = () => {
+    setIsAnalyzed(true)
+    setShowSites(true)
+  }
 
-    const timer = setInterval(() => {
-      currentStep++
-      const p = Math.min(100, Math.round((currentStep / steps) * 100))
-      setProgress(p)
-
-      if (currentStep >= steps) {
-        clearInterval(timer)
-        setTimeout(() => {
-          setIsAnalyzing(false)
-          setIsAnalyzed(true)
-          setShowSites(true)
-        }, 300)
-      }
-    }, interval)
+  const handleClearAnalysis = () => {
+    setIsAnalyzed(false)
+    setShowSites(false)
   }
 
   if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse font-medium tracking-widest">Initialising Spatial Data Engine...</div>
@@ -74,9 +57,8 @@ export default function MapViewPage() {
         isDestroyMode={isDestroyMode}
         setIsDestroyMode={setIsDestroyMode}
         isAnalyzed={isAnalyzed}
-        isAnalyzing={isAnalyzing}
-        progress={progress}
-        handleStartAnalysis={handleStartAnalysis}
+        onAnalysisComplete={handleAnalysisComplete}
+        handleClearAnalysis={handleClearAnalysis}
         showSites={showSites}
         setShowSites={setShowSites}
       />
