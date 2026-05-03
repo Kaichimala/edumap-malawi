@@ -211,7 +211,7 @@ export default function MapDistrictSidebar({
           return (
             <button
               key={d.id}
-              onClick={() => onSelect(d)}
+              onClick={() => onSelect(isSelected ? null : d)}
               className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${
                 isSelected 
                   ? 'bg-blue-50 border-blue-200 shadow-sm' 

@@ -16,7 +16,6 @@ const NAV_ITEMS = [
   { path: '/map', label: 'Map View', icon: HiOutlineMap },
   { path: '/districts', label: 'Districts', icon: HiOutlineFlag },
   { path: '/schools', label: 'Schools', icon: HiOutlineOfficeBuilding },
-  { path: '/sites', label: 'Recommended Sites', icon: HiOutlineLocationMarker },
   { path: '/reports', label: 'Reports', icon: HiOutlineDocumentText },
 ]
 
