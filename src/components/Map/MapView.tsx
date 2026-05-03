@@ -88,8 +88,8 @@ export default function MapView({
   
   const mapRef = useRef(null)
   
-  const { schools, addSchool, removeSchool, getAllSchools } = useSchools(selectedDistrict?.id)
-  const { sites }   = useSites(selectedDistrict?.id, level, schools)
+  const { schools, addSchool, removeSchool, getAllSchools } = useSchools()
+  const { sites }   = useSites()
 
   const handleExport = async (format) => {
     if (!mapRef.current) return
@@ -343,7 +343,7 @@ export default function MapView({
         <MapClickHandler active={isBuildMode} onLocationSelect={setNewSchoolLoc} />
 
         {/* Existing & User-Added Schools (Amber markers) - CONDITIONAL RENDERING */}
-        {showMarkers && showSites && schools.map(s => (
+        {showMarkers && showSites && (schools || []).map(s => (
           <CircleMarker
             key={`school-${s.id}`}
             center={[s.lat, s.lng]}
@@ -369,7 +369,7 @@ export default function MapView({
         ))}
 
         {/* Recommended Sites (Red Pins) - CONDITIONAL RENDERING */}
-        {showMarkers && showSites && sites.map(s => (
+        {showMarkers && showSites && (sites || []).map(s => (
           <Marker
             key={`site-${s.id}`}
             position={[s.lat, s.lng]}
@@ -394,7 +394,7 @@ export default function MapView({
         ))}
 
         {/* Suitable Areas (Analytical Spots) - only show when analyzed */}
-        {isAnalyzed && districts.map(d => {
+        {isAnalyzed && (districts || []).map(d => {
           const pop   = level === 'primary'   ? d.p_age_pop   :
                         level === 'secondary' ? d.s_age_pop   : d.t_age_pop
           const inst  = level === 'primary'   ? d.p_schools   :
