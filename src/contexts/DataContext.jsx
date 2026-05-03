@@ -242,31 +242,59 @@ export function DataProvider({ children }) {
       // 6b. NESIP Criteria Helpers
       // 6b. NESIP Criteria Helpers
       const getTerrainSuitability = (lat, lng) => {
-        // 1. Exclude Water (Lake Chilwa & Lake Malawi)
-        const isInChilwa = (lng > 35.55 && lat < -15.0 && lat > -15.65);
-        const isInLakeMalawi = (lng > 34.6 && lat > -14.5 && lng < 35.3); // Rough boundary for Mangochi/Monkey Bay area
-        if (isInChilwa || isInLakeMalawi) {
+        // 1. National Water Bodies (Lake Malawi, Malombe, Chilwa, Chiuta)
+        const isInLakeMalawi = (lng > 33.9 && lng < 35.3 && lat > -14.5); // Broad North/Central Lake
+        const isInLakeMalombe = (lng > 35.1 && lng < 35.3 && lat < -14.5 && lat > -14.9);
+        const isInLakeChilwa = (lng > 35.5 && lng < 35.9 && lat < -15.0 && lat > -15.6);
+        if (isInLakeMalawi || isInLakeMalombe || isInLakeChilwa) {
           return { excluded: true, reason: 'Water Body (Lake)' };
         }
         
-        // 2. Exclude Gazetted Protected Areas (Forest Reserves & National Parks)
-        // Liwonde National Park (Mangochi/Machinga) - Hardened range
+        // 2. High Altitude / Steep Highlands (Nyika, Viphya, Mulanje, Dedza)
+        // Nyika Plateau (North)
+        const distToNyika = hav(lat, lng, -10.6, 33.8);
+        if (distToNyika < 25) return { excluded: true, reason: 'High Altitude / Rugged (Nyika)' };
+
+        // Viphya Highlands (Mzimba/Nkhata Bay)
+        const distToViphya = hav(lat, lng, -11.8, 33.9);
+        if (distToViphya < 20) return { excluded: true, reason: 'Rugged Terrain (Viphya Highlands)' };
+
+        // Dedza/Ntcheu Mountains
+        const distToDedza = hav(lat, lng, -14.35, 34.3);
+        if (distToDedza < 10) return { excluded: true, reason: 'Steep Slope (Dedza Highlands)' };
+
+        // Mulanje Massif (South)
+        const distToMulanje = hav(lat, lng, -15.95, 35.6);
+        if (distToMulanje < 15) return { excluded: true, reason: 'Steep Slope (Mulanje Massif)' };
+
+        // Zomba Plateau
+        const distToZomba = hav(lat, lng, -15.35, 35.3);
+        if (distToZomba < 6) return { excluded: true, reason: 'Steep Slope (Zomba Plateau)' };
+
+        // 3. National Protected Areas (Parks & Reserves)
+        // Kasungu National Park
+        const isInKasungu = (lng > 33.0 && lng < 33.3 && lat < -12.7 && lat > -13.2);
+        if (isInKasungu) return { excluded: true, reason: 'Protected Area (Kasungu NP)' };
+
+        // Nkhotakota Wildlife Reserve
+        const isInNkhotakota = (lng > 33.9 && lng < 34.3 && lat < -12.6 && lat > -13.1);
+        if (isInNkhotakota) return { excluded: true, reason: 'Protected Area (Nkhotakota WR)' };
+
+        // Liwonde NP & Mangochi Forest Reserves (Already Hardened)
         const isInLiwonde = (lng > 35.15 && lng < 35.45 && lat < -14.65 && lat > -15.15);
-        if (isInLiwonde) return { excluded: true, reason: 'Protected Area (Liwonde National Park)' };
-
-        // Mangochi Forest Reserve (Highlands near the town/lake)
-        const isInMangochiFR = (lng > 35.35 && lng < 35.55 && lat < -14.25 && lat > -14.65);
-        if (isInMangochiFR) return { excluded: true, reason: 'Protected Area (Mangochi Forest Reserve)' };
+        if (isInLiwonde) return { excluded: true, reason: 'Protected Area (Liwonde NP)' };
         
-        // Namizimu Forest Reserve (Eastern border mountains)
-        const isInNamizimu = (lng > 35.45 && lat < -13.9 && lat > -14.4);
-        if (isInNamizimu) return { excluded: true, reason: 'Protected Area (Namizimu Forest Reserve)' };
+        const isInMangochiFR = (lng > 35.35 && lng < 35.55 && lat < -14.25 && lat > -14.65);
+        if (isInMangochiFR) return { excluded: true, reason: 'Protected Area (Forest Reserve)' };
 
-        // 3. Exclude Slopes > 15° (Mulanje/Zomba/Mangochi Highlands)
-        const distToPlateau = hav(lat, lng, -15.35, 35.3);
-        if (distToPlateau < 5) return { excluded: true, reason: 'Steep Slope (>15°)' };
+        // 4. Major Wetlands & Marshes
+        const isInElephantMarsh = (lng > 34.75 && lng < 35.15 && lat < -16.0 && lat > -16.6);
+        if (isInElephantMarsh) return { excluded: true, reason: 'Wetland (Elephant Marsh)' };
+        
+        const isInChilwaSwamp = (lng > 35.45 && lng < 35.95 && lat < -14.7 && lat > -15.6);
+        if (isInChilwaSwamp) return { excluded: true, reason: 'Marshland (Chilwa Basin)' };
 
-        // Hazard Risk (Flood plains)
+        // Hazard Risk (General Flood plains)
         const isFloodProne = (lat < -16.0 && lng < 35.2);
         
         return { 
