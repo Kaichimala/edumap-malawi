@@ -240,27 +240,39 @@ export function DataProvider({ children }) {
       // using spatial probability (e.g., proximity to certain longitudes/latitudes 
       // known for mountains or flood plains in Malawi)
       // 6b. NESIP Criteria Helpers
+      // 6b. NESIP Criteria Helpers
       const getTerrainSuitability = (lat, lng) => {
-        // Exclude Water (Zomba/Lake Chilwa specific check)
-        // Chilwa is approx 35.6 - 35.9 East, -15.1 to -15.5 South
-        // Stricter check: Lake Chilwa boundary is actually slightly further west than 35.65 in some parts
+        // 1. Exclude Water (Lake Chilwa & Lake Malawi)
         const isInChilwa = (lng > 35.55 && lat < -15.0 && lat > -15.65);
-        if (isInChilwa) {
-          return { excluded: true, reason: 'Water Body (Lake Chilwa)' };
+        const isInLakeMalawi = (lng > 34.6 && lat > -14.5 && lng < 35.3); // Rough boundary for Mangochi/Monkey Bay area
+        if (isInChilwa || isInLakeMalawi) {
+          return { excluded: true, reason: 'Water Body (Lake)' };
         }
         
-        // Exclude Slopes > 15° (Simulated terrain for Mulanje/Zomba Plateau areas)
-        // Zomba Plateau approx 35.3 East, -15.35 South
+        // 2. Exclude Gazetted Protected Areas (Forest Reserves & National Parks)
+        // Liwonde National Park (Mangochi/Machinga) - Hardened range
+        const isInLiwonde = (lng > 35.15 && lng < 35.45 && lat < -14.65 && lat > -15.15);
+        if (isInLiwonde) return { excluded: true, reason: 'Protected Area (Liwonde National Park)' };
+
+        // Mangochi Forest Reserve (Highlands near the town/lake)
+        const isInMangochiFR = (lng > 35.35 && lng < 35.55 && lat < -14.25 && lat > -14.65);
+        if (isInMangochiFR) return { excluded: true, reason: 'Protected Area (Mangochi Forest Reserve)' };
+        
+        // Namizimu Forest Reserve (Eastern border mountains)
+        const isInNamizimu = (lng > 35.45 && lat < -13.9 && lat > -14.4);
+        if (isInNamizimu) return { excluded: true, reason: 'Protected Area (Namizimu Forest Reserve)' };
+
+        // 3. Exclude Slopes > 15° (Mulanje/Zomba/Mangochi Highlands)
         const distToPlateau = hav(lat, lng, -15.35, 35.3);
         if (distToPlateau < 5) return { excluded: true, reason: 'Steep Slope (>15°)' };
 
-        // Hazard Risk (Flood plains in Shire Valley / Nsanje)
+        // Hazard Risk (Flood plains)
         const isFloodProne = (lat < -16.0 && lng < 35.2);
         
         return { 
           excluded: false, 
           hazardRisk: isFloodProne ? 'High' : 'Low',
-          growthZone: (lng > 35.0 && lng < 35.5) ? 1.2 : 1.0 // Prefer peri-urban growth zones
+          growthZone: (lng > 35.0 && lng < 35.5) ? 1.2 : 1.0 
         };
       };
 

@@ -42,33 +42,27 @@ export default function MapLegend({ mode }) {
         {MODE_LABELS[mode]}
       </h4>
 
-      {/* District color scale */}
-      <div className="space-y-1.5 mb-3">
-        {items.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-2.5">
-            <span
-              className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
-              style={{ backgroundColor: item.color }}
-            />
-            <span className="text-xs text-slate-600">{item.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Divider */}
-      <div className="border-t border-slate-100 my-2.5" />
-
-      {/* Marker types */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2.5">
-          <span className="w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-white shadow-sm shrink-0" />
-          <span className="text-xs text-slate-500">School</span>
+      {/* Analysis Details (Only show what is currently relevant) */}
+      {mode !== 'suitability' && (
+        <div className="space-y-1.5 mb-3">
+          {items.map((item, idx) => (
+            <div key={idx} className="flex items-center gap-2.5">
+              <span
+                className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
+                style={{ backgroundColor: item.color }}
+              />
+              <span className="text-xs text-slate-600">{item.label}</span>
+            </div>
+          ))}
         </div>
-        <div className="flex items-center gap-2.5">
-          <span className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-sm shrink-0" />
-          <span className="text-xs text-slate-500">Recommended Site</span>
+      )}
+
+      {/* Suitability specific legend already handled by MapViewPage unified legend */}
+      {mode === 'suitability' && (
+        <div className="text-[10px] text-slate-400 font-medium leading-relaxed">
+          Suitability rankings are calculated based on MoE population-to-institution ratios.
         </div>
-      </div>
+      )}
     </div>
   )
 }

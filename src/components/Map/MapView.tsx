@@ -186,13 +186,15 @@ export default function MapView({
   setIsBuildMode,
   isDestroyMode,
   setIsDestroyMode,
-  isAnalyzed
+  isAnalyzed,
+  visibleLevels = ['primary'] // Multi-level toggle state
 }) {
   // Analytical modes removed per user request
   const [exportLoading, setExportLoading] = useState(false)
   const [newSchoolLoc, setNewSchoolLoc] = useState(null)
   const [formState, setFormState] = useState({ name: '', capacity: 400, level: 'primary' })
   const [destroySearch, setDestroySearch] = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
   
   const mapRef = useRef(null)
   
@@ -407,32 +409,42 @@ export default function MapView({
         </div>
       )}
 
-      {/* Export Button Overlay */}
-      <div className="absolute bottom-6 right-6 z-[500] flex items-center gap-2 export-ignore">
-        <button
-          onClick={() => handleExport('pdf')}
-          disabled={exportLoading}
-          className="flex items-center gap-2 bg-red-600 text-white px-5 py-3 rounded-2xl shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none group"
-        >
-          {exportLoading ? (
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <FaFilePdf className="w-5 h-5 group-hover:scale-110 transition-transform" />
-          )}
-          <span className="font-semibold text-sm">Export PDF</span>
-        </button>
+      {/* Export Menu (Consolidated & Collapsible) */}
+      <div 
+        className="absolute bottom-6 right-6 z-[500] flex flex-col items-end gap-2 export-ignore"
+        onMouseEnter={() => setShowExportMenu(true)}
+        onMouseLeave={() => setShowExportMenu(false)}
+      >
+        <div className={`flex flex-col gap-2 transition-all duration-300 origin-bottom mb-2 ${showExportMenu ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
+          <button
+            onClick={() => handleExport('pdf')}
+            disabled={exportLoading}
+            className="flex items-center gap-2 bg-white text-slate-700 px-4 py-2.5 rounded-xl shadow-xl hover:bg-slate-50 border border-slate-200 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <FaFilePdf className="text-red-500" />
+            <span className="font-bold text-[10px] uppercase tracking-wider">Export PDF</span>
+          </button>
+
+          <button
+            onClick={() => handleExport('png')}
+            disabled={exportLoading}
+            className="flex items-center gap-2 bg-white text-slate-700 px-4 py-2.5 rounded-xl shadow-xl hover:bg-slate-50 border border-slate-200 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <LuFileImage className="text-blue-500" />
+            <span className="font-bold text-[10px] uppercase tracking-wider">Export Image</span>
+          </button>
+        </div>
 
         <button
-          onClick={() => handleExport('png')}
-          disabled={exportLoading}
-          className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl shadow-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none group"
+          onClick={() => setShowExportMenu(!showExportMenu)}
+          className="flex items-center gap-2 bg-[#1a5276] text-white px-6 py-3 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all active:scale-95 relative"
         >
           {exportLoading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
-            <LuFileImage className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            <HiDownload className="w-5 h-5" />
           )}
-          <span className="font-semibold text-sm">Export Image</span>
+          <span className="font-bold text-xs tracking-tight uppercase">Tools & Export</span>
         </button>
       </div>
 
@@ -494,15 +506,29 @@ export default function MapView({
               }}
             >
               <Tooltip sticky className="bg-white/90 backdrop-blur border border-slate-200 shadow-xl rounded-xl p-3">
-                <div className="font-bold text-slate-800 text-sm mb-1">{d.name}</div>
-                <div className="flex flex-col gap-1">
+                <div className="font-bold text-slate-800 text-sm mb-2">{d.name}</div>
+                <div className="flex flex-col gap-1.5 min-w-[140px]">
                   <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500">Primary Schools:</span>
-                    <span className="font-semibold text-blue-600">{d.p_schools}</span>
+                    <span className="text-slate-500 capitalize">{level} {level === 'tertiary' ? 'Institutions' : 'Schools'}:</span>
+                    <span className="font-black text-blue-600">
+                      {level === 'primary' ? d.p_schools : level === 'secondary' ? d.s_schools : d.t_institutions}
+                    </span>
                   </div>
                   <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500">Population:</span>
-                    <span className="font-semibold text-slate-700">{d.p_age_pop?.toLocaleString() || 'N/A'}</span>
+                    <span className="text-slate-500">Target Pop:</span>
+                    <span className="font-bold text-slate-700">
+                      {(level === 'primary' ? d.p_age_pop : level === 'secondary' ? d.s_age_pop : d.t_age_pop)?.toLocaleString() || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="mt-1 pt-1 border-t border-slate-100 flex justify-between items-center">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Need Score</span>
+                    <span className="text-[10px] font-black text-red-500">
+                      {Math.round(calcScore(
+                        level === 'primary' ? d.p_age_pop : level === 'secondary' ? d.s_age_pop : d.t_age_pop,
+                        level === 'primary' ? d.p_schools : level === 'secondary' ? d.s_schools : d.t_institutions,
+                        level
+                      ))}
+                    </span>
                   </div>
                 </div>
               </Tooltip>
@@ -513,61 +539,63 @@ export default function MapView({
         <FlyTo district={selectedDistrict} />
         <MapClickHandler active={isBuildMode} onLocationSelect={setNewSchoolLoc} />
 
-        {/* Existing & User-Added Schools (Color Coded by Level) */}
-        {showMarkers && (schools || []).map(s => {
-          let markerColor = '#22c55e'; // Default Green
-          if (s.isUserAdded) {
-            markerColor = '#f59e0b'; // Amber
-          } else if (s.level === 'primary') {
-            markerColor = '#3b82f6'; // Blue
-          } else if (s.level === 'secondary') {
-            markerColor = '#22c55e'; // Green
-          } else if (s.level === 'tertiary') {
-            markerColor = '#a855f7'; // Purple
-          }
+        {/* Existing & User-Added Schools (Filtered by visibleLevels) */}
+        {showMarkers && (schools || [])
+          .filter(s => visibleLevels.includes(s.level) || s.isUserAdded)
+          .map(s => {
+            let markerColor = '#22c55e'; // Default Green
+            if (s.isUserAdded) {
+              markerColor = '#f59e0b'; // Amber
+            } else if (s.level === 'primary') {
+              markerColor = '#3b82f6'; // Blue
+            } else if (s.level === 'secondary') {
+              markerColor = '#22c55e'; // Green
+            } else if (s.level === 'tertiary') {
+              markerColor = '#a855f7'; // Purple
+            }
 
-          return (
-            <CircleMarker
-              key={`school-${s.id}`}
-              center={[s.lat, s.lng]}
-              radius={s.isUserAdded ? 8 : 5}
-              pathOptions={{ 
-                color: '#ffffff', 
-                fillColor: markerColor, 
-                fillOpacity: 1, 
-                weight: s.isUserAdded ? 3 : 1.5 
-              }}
-              eventHandlers={{
-                mouseover: (e) => {
-                  e.target.setRadius(s.isUserAdded ? 12 : 9);
-                  e.target.setStyle({ weight: 3, opacity: 1 });
-                },
-                mouseout: (e) => {
-                  e.target.setRadius(s.isUserAdded ? 8 : 5);
-                  e.target.setStyle({ weight: s.isUserAdded ? 3 : 1.5, opacity: 1 });
-                }
-              }}
-            >
-              <Tooltip className="bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-xl p-3">
-                <div className="font-bold flex items-center gap-2 text-slate-800 text-sm mb-1">
-                  {s.isUserAdded && <MdConstruction className="text-amber-600" />}
-                  {s.name}
-                  {s.isUserAdded && <span className="text-[8px] bg-amber-100 text-amber-700 px-1 rounded uppercase">New</span>}
-                </div>
-                <div className="flex flex-col gap-1 mt-2">
-                  <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500">Level:</span>
-                    <span className="font-semibold text-slate-700 capitalize">{s.level || 'Primary'}</span>
+            return (
+              <CircleMarker
+                key={`school-${s.id}`}
+                center={[s.lat, s.lng]}
+                radius={s.isUserAdded ? 8 : 5}
+                pathOptions={{ 
+                  color: '#ffffff', 
+                  fillColor: markerColor, 
+                  fillOpacity: 1, 
+                  weight: s.isUserAdded ? 3 : 1.5 
+                }}
+                eventHandlers={{
+                  mouseover: (e) => {
+                    e.target.setRadius(s.isUserAdded ? 12 : 9);
+                    e.target.setStyle({ weight: 3, opacity: 1 });
+                  },
+                  mouseout: (e) => {
+                    e.target.setRadius(s.isUserAdded ? 8 : 5);
+                    e.target.setStyle({ weight: s.isUserAdded ? 3 : 1.5, opacity: 1 });
+                  }
+                }}
+              >
+                <Tooltip className="bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-xl p-3">
+                  <div className="font-bold flex items-center gap-2 text-slate-800 text-sm mb-1">
+                    {s.isUserAdded && <MdConstruction className="text-amber-600" />}
+                    {s.name}
+                    {s.isUserAdded && <span className="text-[8px] bg-amber-100 text-amber-700 px-1 rounded uppercase">New</span>}
                   </div>
-                  <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500">Students:</span>
-                    <span className="font-semibold text-blue-600">{s.students?.toLocaleString() || 'N/A'}</span>
+                  <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex justify-between gap-4 text-xs">
+                      <span className="text-slate-500">Level:</span>
+                      <span className="font-semibold text-slate-700 capitalize">{s.level || 'Primary'}</span>
+                    </div>
+                    <div className="flex justify-between gap-4 text-xs">
+                      <span className="text-slate-500">Students:</span>
+                      <span className="font-semibold text-blue-600">{s.students?.toLocaleString() || 'N/A'}</span>
+                    </div>
                   </div>
-                </div>
-              </Tooltip>
-            </CircleMarker>
-          )
-        })}
+                </Tooltip>
+              </CircleMarker>
+            )
+          })}
 
         {/* Recommended Sites — memoized to prevent zoom/pan lag */}
         {showMarkers && showSites && isAnalyzed && selectedDistrict && (analysisSites?.[level]?.length > 0) && (
