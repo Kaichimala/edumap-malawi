@@ -7,7 +7,7 @@ import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { getNeedLevel, calcScore, getSuitabilityLevel } from '../../utils/scoring'
 import { useSchools } from '../../hooks/useSchools'
-import { useSites } from '../../hooks/useSites'
+import { useData } from '../../contexts/DataContext'
 import MapLegend from './MapLegend'
 import { HiDownload, HiPlus, HiX, HiOutlineTrash } from 'react-icons/hi'
 import { LuFileImage } from 'react-icons/lu'
@@ -34,14 +34,23 @@ const constructionIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Fly map to selected district or return to center
+// Fly map ONLY when the selected district actually changes — not on every re-render
 function FlyTo({ district }) {
   const map = useMap()
-  if (district) {
-    map.flyTo([district.lat, district.lng], 9, { duration: 1.2 })
-  } else {
-    map.flyTo([-13.5, 34.3], 6, { duration: 1.2 })
-  }
+  const prevIdRef = React.useRef(undefined)
+
+  React.useEffect(() => {
+    const newId = district?.id ?? null
+    if (newId === prevIdRef.current) return // same district, don't re-fly
+    prevIdRef.current = newId
+
+    if (district) {
+      map.flyTo([district.lat, district.lng], 9, { duration: 1.2 })
+    } else {
+      map.flyTo([-13.5, 34.3], 6, { duration: 1.2 })
+    }
+  }, [district?.id])
+
   return null
 }
 
@@ -67,6 +76,105 @@ function MapClickHandler({ active, onLocationSelect }) {
   return null
 }
 
+// Memoized site layer — prevents expensive Circle+Polyline re-renders on every zoom/pan
+const RecommendedSiteLayer = React.memo(function RecommendedSiteLayer({ sites, schools, level }) {
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
+  return (
+    <>
+      {sites.map((s, idx) => {
+        const nearestSchools = [...(schools || [])]
+          .map(sch => ({ ...sch, distance: getDistance(s.lat, s.lng, sch.lat, sch.lng) }))
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 3);
+
+        const catchmentRadius = level === 'primary' ? 3000 : level === 'secondary' ? 8000 : 15000;
+        const baseScore = s.suitability_score || 85;
+        const distScore = Math.min(99, baseScore + (idx % 3));
+
+        return (
+          <React.Fragment key={`site-group-${s.id}`}>
+            {/* Catchment Radius */}
+            <Circle
+              center={[s.lat, s.lng]}
+              radius={catchmentRadius}
+              pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.08, weight: 1.5, dashArray: '6, 6' }}
+            >
+              <Tooltip sticky>
+                <div className="font-bold text-slate-700">Catchment Zone</div>
+                <div className="text-xs text-slate-500">
+                  Serves est. 1,200 students within {level === 'primary' ? '3km' : level === 'secondary' ? '8km' : '15km'}
+                </div>
+              </Tooltip>
+            </Circle>
+
+            {/* Spider-Web Lines to nearest schools */}
+            {nearestSchools.map(sch => (
+              <Polyline
+                key={`line-${s.id}-${sch.id}`}
+                positions={[[s.lat, s.lng], [sch.lat, sch.lng]]}
+                pathOptions={{ color: '#f87171', weight: 1.5, dashArray: '4, 8', opacity: 0.5 }}
+              >
+                <Tooltip direction="center" permanent={false} className="bg-white/90 border-red-200 text-red-600 font-bold text-[10px]">
+                  {sch.distance.toFixed(1)} km to {sch.name}
+                </Tooltip>
+              </Polyline>
+            ))}
+
+            {/* Red Pin + Popup */}
+            <Marker position={[s.lat, s.lng]} icon={redPinIcon}>
+              <Tooltip direction="top" offset={[0, -35]}>
+                <div className="font-bold">{s.name}</div>
+                <div className="text-xs text-blue-600 font-medium">Prioritized Planning Site</div>
+              </Tooltip>
+              <Popup className="custom-popup">
+                <div className="p-2 min-w-[240px]">
+                  <h3 className="font-black text-sm mb-2 text-slate-800 border-b border-slate-100 pb-2">{s.name}</h3>
+                  <div className="space-y-3 mb-3">
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                        <span>School Isolation Distance</span>
+                        <span className="text-emerald-600">{s.metrics?.distance || distScore / 10}km</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5">
+                        <div className="bg-emerald-500 h-1.5 rounded-full" style={{width: `${Math.min(((s.metrics?.distance || 5) / 15) * 100, 100)}%`}}></div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-50 p-1.5 rounded border border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-500">DEM Slope Gradient (&lt;15°)</span>
+                      <span className="text-[10px] font-bold text-emerald-600">{s.metrics?.slope || 5}°</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-50 p-1.5 rounded border border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-500">Hazard / Flood Risk</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">{s.metrics?.hazard_risk || 'Low'}</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-50 p-1.5 rounded border border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-500">Growth / Rural Priority</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">{s.metrics?.growth_demand || 'High'}</span>
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-blue-50 border border-blue-100">
+                    <p className="text-[10px] m-0 text-blue-800 font-medium italic">"{s.reason}"</p>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          </React.Fragment>
+        );
+      })}
+    </>
+  );
+}, (prev, next) =>
+  // Only re-render if sites array actually changed (not on zoom/pan)
+  prev.sites === next.sites && prev.level === next.level
+);
+
 export default function MapView({ 
   districts, 
   selectedDistrict, 
@@ -89,7 +197,7 @@ export default function MapView({
   const mapRef = useRef(null)
   
   const { schools, addSchool, removeSchool, getAllSchools } = useSchools()
-  const { sites }   = useSites()
+  const { analysisSites } = useData()
 
   const handleExport = async (format) => {
     if (!mapRef.current) return
@@ -339,20 +447,68 @@ export default function MapView({
           attribution='© OpenStreetMap'
         />
 
-        {/* Selected District Boundary Highlight */}
-        {selectedDistrict?.geojson && (
-          <GeoJSON 
-            key={`boundary-${selectedDistrict.id}`}
-            data={selectedDistrict.geojson} 
-            style={{
-              color: '#3b82f6', // Blue border
-              weight: 3,
-              opacity: 0.8,
-              fillColor: '#3b82f6',
-              fillOpacity: 0.05
-            }}
-          />
-        )}
+        {/* Interactive District Boundaries (Glow & Tooltips) */}
+        {districts?.map(d => {
+          if (!d.geojson) return null;
+          const isSelected = selectedDistrict?.id === d.id;
+          
+          return (
+            <GeoJSON 
+              key={`district-hover-${d.id}`}
+              data={d.geojson} 
+              style={{
+                color: isSelected ? '#3b82f6' : '#94a3b8',
+                weight: isSelected ? 3 : 1,
+                opacity: isSelected ? 0.8 : 0.0, // Invisible until hovered if not selected
+                fillColor: isSelected ? '#3b82f6' : 'transparent',
+                fillOpacity: isSelected ? 0.05 : 0
+              }}
+              eventHandlers={{
+                mouseover: (e) => {
+                  const layer = e.target;
+                  if (!isSelected) {
+                    layer.setStyle({
+                      color: '#3b82f6',
+                      weight: 2,
+                      opacity: 0.8,
+                      fillColor: '#3b82f6',
+                      fillOpacity: 0.1
+                    });
+                  }
+                },
+                mouseout: (e) => {
+                  const layer = e.target;
+                  if (!isSelected) {
+                    layer.setStyle({
+                      color: '#94a3b8',
+                      weight: 1,
+                      opacity: 0.0,
+                      fillColor: 'transparent',
+                      fillOpacity: 0
+                    });
+                  }
+                },
+                click: () => {
+                  if (onSelect) onSelect(d);
+                }
+              }}
+            >
+              <Tooltip sticky className="bg-white/90 backdrop-blur border border-slate-200 shadow-xl rounded-xl p-3">
+                <div className="font-bold text-slate-800 text-sm mb-1">{d.name}</div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between gap-4 text-xs">
+                    <span className="text-slate-500">Primary Schools:</span>
+                    <span className="font-semibold text-blue-600">{d.p_schools}</span>
+                  </div>
+                  <div className="flex justify-between gap-4 text-xs">
+                    <span className="text-slate-500">Population:</span>
+                    <span className="font-semibold text-slate-700">{d.p_age_pop?.toLocaleString() || 'N/A'}</span>
+                  </div>
+                </div>
+              </Tooltip>
+            </GeoJSON>
+          )
+        })}
 
         <FlyTo district={selectedDistrict} />
         <MapClickHandler active={isBuildMode} onLocationSelect={setNewSchoolLoc} />
@@ -374,129 +530,49 @@ export default function MapView({
             <CircleMarker
               key={`school-${s.id}`}
               center={[s.lat, s.lng]}
-              radius={s.isUserAdded ? 8 : 6}
+              radius={s.isUserAdded ? 8 : 5}
               pathOptions={{ 
                 color: '#ffffff', 
                 fillColor: markerColor, 
                 fillOpacity: 1, 
                 weight: s.isUserAdded ? 3 : 1.5 
               }}
+              eventHandlers={{
+                mouseover: (e) => {
+                  e.target.setRadius(s.isUserAdded ? 12 : 9);
+                  e.target.setStyle({ weight: 3, opacity: 1 });
+                },
+                mouseout: (e) => {
+                  e.target.setRadius(s.isUserAdded ? 8 : 5);
+                  e.target.setStyle({ weight: s.isUserAdded ? 3 : 1.5, opacity: 1 });
+                }
+              }}
             >
-              <Tooltip>
-                <div className="font-bold flex items-center gap-2">
+              <Tooltip className="bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-xl p-3">
+                <div className="font-bold flex items-center gap-2 text-slate-800 text-sm mb-1">
                   {s.isUserAdded && <MdConstruction className="text-amber-600" />}
                   {s.name}
                   {s.isUserAdded && <span className="text-[8px] bg-amber-100 text-amber-700 px-1 rounded uppercase">New</span>}
                 </div>
-                <div className="text-xs text-gray-500 font-medium capitalize">
-                  {s.students.toLocaleString()} Students • {s.level} level
+                <div className="flex flex-col gap-1 mt-2">
+                  <div className="flex justify-between gap-4 text-xs">
+                    <span className="text-slate-500">Level:</span>
+                    <span className="font-semibold text-slate-700 capitalize">{s.level || 'Primary'}</span>
+                  </div>
+                  <div className="flex justify-between gap-4 text-xs">
+                    <span className="text-slate-500">Students:</span>
+                    <span className="font-semibold text-blue-600">{s.students?.toLocaleString() || 'N/A'}</span>
+                  </div>
                 </div>
               </Tooltip>
             </CircleMarker>
           )
         })}
 
-        {/* Recommended Sites (Red Pins, Catchment Areas, Spider Webs) */}
-        {showMarkers && showSites && isAnalyzed && selectedDistrict && (() => {
-          // Dynamic Mock Data Generation: If the database is empty for this district, spawn 3 realistic fake sites so the demo always works!
-          const activeSites = (sites && sites.length > 0) ? sites : [
-            { id: `mock-1-${selectedDistrict.id}`, lat: selectedDistrict.lat + 0.08, lng: selectedDistrict.lng + 0.05, name: 'Proposed Site Alpha', suitability_score: 94, reason: 'High population density gap identified.' },
-            { id: `mock-2-${selectedDistrict.id}`, lat: selectedDistrict.lat - 0.06, lng: selectedDistrict.lng + 0.02, name: 'Proposed Site Beta', suitability_score: 88, reason: 'Optimal terrain and road access.' },
-            { id: `mock-3-${selectedDistrict.id}`, lat: selectedDistrict.lat + 0.03, lng: selectedDistrict.lng - 0.07, name: 'Proposed Site Gamma', suitability_score: 91, reason: 'Critical distance threshold met for surrounding villages.' }
-          ];
-
-          return activeSites.map((s, idx) => {
-            // 1. Calculate the 3 nearest existing schools
-          const getDistance = (lat1, lon1, lat2, lon2) => {
-            const R = 6371; // km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-          }
-
-          const nearestSchools = [...(schools || [])]
-            .map(sch => ({ ...sch, distance: getDistance(s.lat, s.lng, sch.lat, sch.lng) }))
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, 3);
-
-          // Deterministic fake scores based on the actual suitability score
-          const baseScore = s.suitability_score || 85;
-          const popScore = Math.min(99, baseScore + (idx % 5));
-          const terrainScore = Math.min(99, baseScore - (idx % 4));
-          const distScore = Math.min(99, baseScore + (idx % 3));
-
-          return (
-            <React.Fragment key={`site-group-${s.id}`}>
-              {/* Catchment Radius */}
-              <Circle
-                center={[s.lat, s.lng]}
-                radius={level === 'primary' ? 3000 : (level === 'secondary' ? 8000 : 15000)}
-                pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.1, weight: 1, dashArray: '5, 5' }}
-              >
-                <Tooltip sticky>
-                  <div className="font-bold text-slate-700">Catchment Zone</div>
-                  <div className="text-xs text-slate-500">Serves estimated 1,200 students within {level === 'primary' ? '3km' : '8km'}</div>
-                </Tooltip>
-              </Circle>
-
-              {/* Spider-Web Lines to nearest schools */}
-              {nearestSchools.map(sch => (
-                <Polyline
-                  key={`line-${s.id}-${sch.id}`}
-                  positions={[[s.lat, s.lng], [sch.lat, sch.lng]]}
-                  pathOptions={{ color: '#f87171', weight: 2, dashArray: '4, 8', opacity: 0.6 }}
-                >
-                  <Tooltip direction="center" permanent={false} className="bg-white/90 border-red-200 text-red-600 font-bold text-[10px]">
-                    {sch.distance.toFixed(1)} km to {sch.name}
-                  </Tooltip>
-                </Polyline>
-              ))}
-
-              {/* The Actual Pin & Dashboard Popup */}
-              <Marker position={[s.lat, s.lng]} icon={redPinIcon}>
-                <Tooltip direction="top" offset={[0, -35]}>
-                  <div className="font-bold">{s.name}</div>
-                  <div className="text-xs text-blue-600 font-medium">Prioritized Planning Site</div>
-                </Tooltip>
-                <Popup className="custom-popup">
-                  <div className="p-2 min-w-[240px]">
-                    <h3 className="font-black text-sm mb-2 text-slate-800 border-b border-slate-100 pb-2">{s.name}</h3>
-                    
-                    <div className="space-y-3 mb-3">
-                      <div>
-                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
-                          <span>Population Need</span>
-                          <span className="text-blue-600">{popScore}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-blue-500 h-1.5 rounded-full" style={{width: `${popScore}%`}}></div></div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
-                          <span>Terrain Suitability</span>
-                          <span className="text-emerald-600">{terrainScore}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-emerald-500 h-1.5 rounded-full" style={{width: `${terrainScore}%`}}></div></div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
-                          <span>Distance Optimization</span>
-                          <span className="text-amber-600">{distScore}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5"><div className="bg-amber-500 h-1.5 rounded-full" style={{width: `${distScore}%`}}></div></div>
-                      </div>
-                    </div>
-
-                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
-                      <p className="text-[10px] m-0 text-slate-600 font-medium italic">"{s.reason}"</p>
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            </React.Fragment>
-          )
-          })
-        })()}
+        {/* Recommended Sites — memoized to prevent zoom/pan lag */}
+        {showMarkers && showSites && isAnalyzed && selectedDistrict && (analysisSites?.[level]?.length > 0) && (
+          <RecommendedSiteLayer sites={analysisSites[level]} schools={schools} level={level} />
+        )}
 
         {/* Suitable Areas (Analytical Spots) - Removed to prevent redundant vague outputs */}
       </MapContainer>

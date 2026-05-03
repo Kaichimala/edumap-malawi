@@ -10,7 +10,8 @@ export const useSites = () => {
     selectedDistrictId, 
     setSelectedDistrictId,
     level,
-    setLevel
+    setLevel,
+    runSpatialAnalysis
   } = useData()
 
   const filteredSites = useMemo(() => {
@@ -32,6 +33,7 @@ export const useSites = () => {
     selectedDistrictId,
     setSelectedDistrictId,
     level,
-    setLevel
+    setLevel,
+    runSpatialAnalysis
   }
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { calcScore, getNeedLevel } from '../../utils/scoring'
 import { HiOutlineSearch, HiOutlineChevronRight, HiOutlineChartBar, HiOutlineCheckCircle, HiOutlineEye, HiOutlineEyeOff, HiOutlineTrash } from 'react-icons/hi'
 import { MdConstruction } from 'react-icons/md'
+import { useSites } from '../../hooks/useSites'
 
 export default function MapDistrictSidebar({ 
   districts, 
@@ -22,28 +23,32 @@ export default function MapDistrictSidebar({
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [progress, setProgress] = useState(0)
 
-  const handleStartAnalysis = () => {
+  const { runSpatialAnalysis } = useSites()
+
+  const handleStartAnalysis = async () => {
     setIsAnalyzing(true)
     setProgress(0)
     
-    const duration = 2500
-    const interval = 50
-    const steps = duration / interval
-    let currentStep = 0
-
-    const timer = setInterval(() => {
-      currentStep++
-      const p = Math.min(100, Math.round((currentStep / steps) * 100))
+    // Step 1: Animate to 80% while PostGIS processes
+    let p = 0
+    const fastInterval = setInterval(() => {
+      p = Math.min(p + 4, 80)
       setProgress(p)
-
-      if (currentStep >= steps) {
-        clearInterval(timer)
-        setTimeout(() => {
-          setIsAnalyzing(false)
-          onAnalysisComplete()
-        }, 300)
-      }
-    }, interval)
+      if (p >= 80) clearInterval(fastInterval)
+    }, 60)
+    
+    // Step 2: AWAIT the full analysis — computes all 3 levels in one pass
+    const results = await runSpatialAnalysis(selectedDistrict.id, selectedDistrict)
+    console.log('[Sidebar] Analysis done. Sites returned:', results?.length)
+    
+    clearInterval(fastInterval)
+    
+    // Step 3: Snap to 100% and signal completion
+    setProgress(100)
+    setTimeout(() => {
+      setIsAnalyzing(false)
+      onAnalysisComplete()
+    }, 300)
   }
 
   const filteredDistricts = districts.filter(d => 
