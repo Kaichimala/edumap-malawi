@@ -67,12 +67,25 @@ export function DataProvider({ children }) {
         if (s.amenity === 'university' || s.amenity === 'college' || ['UNIVERSITY', 'COLLEGE', 'FACULTY', 'POLYTECHNIC', 'INSTITUTE', 'TRAINING CENTRE'].some(k => upperName.includes(k))) {
           level = 'tertiary';
           students = 8000;
-          if (upperName.includes('COLLEGE OF MEDICINE') || upperName.includes('KUHES') || (upperName.includes('UNIVERSITY OF MALAWI') && lng < 35.1)) {
+          
+          // Fix: If it says University of Malawi but is in Blantyre (lng < 35.1), it's actually KUHeS
+          const isKuhes = upperName.includes('COLLEGE OF MEDICINE') || 
+                          upperName.includes('KUHES') || 
+                          (upperName.includes('NURSING') && !upperName.includes('ZOMBA')) ||
+                          (upperName.includes('UNIVERSITY OF MALAWI') && lng < 35.1);
+
+          if (isKuhes) {
             displayName = 'Kamuzu University of Health Sciences (KUHeS)';
-          } else if (upperName.includes('CHANCELLOR COLLEGE') || (upperName.includes('UNIVERSITY OF MALAWI') && !upperName.includes('LAW'))) {
+          } else if (upperName.includes('CHANCELLOR') || upperName.includes('UNIVERSITY OF MALAWI') || upperName.includes('UNIMA') || upperName.includes('FACULTY') || upperName.includes('CENTRE')) {
             displayName = 'University of Malawi (UNIMA)';
+          } else if (upperName.includes('POLYTECHNIC') || upperName.includes('MUBAS') || upperName.includes('BUSINESS AND APPLIED')) {
+            displayName = 'Malawi University of Business and Applied Sciences (MUBAS)';
+          } else if (upperName.includes('MZUZU UNIVERSITY') || upperName.includes('MZUNI')) {
+            displayName = 'Mzuzu University (MZUNI)';
+          } else if (upperName.includes('LUANAR') || upperName.includes('BUNDUNDA') || upperName.includes('NATURAL RESOURCES')) {
+            displayName = 'LUANAR';
           }
-        } else if (['SECONDARY', 'CDSS', 'HIGH SCHOOL'].some(k => upperName.includes(k))) {
+        } else if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
           level = 'secondary';
           students = 280;
         }

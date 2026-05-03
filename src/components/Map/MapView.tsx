@@ -342,34 +342,47 @@ export default function MapView({
         <FlyTo district={selectedDistrict} />
         <MapClickHandler active={isBuildMode} onLocationSelect={setNewSchoolLoc} />
 
-        {/* Existing & User-Added Schools (Amber markers) - CONDITIONAL RENDERING */}
-        {showMarkers && showSites && (schools || []).map(s => (
-          <CircleMarker
-            key={`school-${s.id}`}
-            center={[s.lat, s.lng]}
-            radius={s.isUserAdded ? 8 : 6}
-            pathOptions={{ 
-              color:     s.isUserAdded ? '#d97706' : '#ffffff', 
-              fillColor: s.isUserAdded ? '#f59e0b' : '#22c55e', 
-              fillOpacity: 1, 
-              weight: s.isUserAdded ? 3 : 1.5 
-            }}
-          >
-            <Tooltip>
-              <div className="font-bold flex items-center gap-2">
-                {s.isUserAdded && <MdConstruction className="text-amber-600" />}
-                {s.name}
-                {s.isUserAdded && <span className="text-[8px] bg-amber-100 text-amber-700 px-1 rounded uppercase">New</span>}
-              </div>
-              <div className="text-xs text-gray-500 font-medium">
-                {s.students} Students • {s.level} level
-              </div>
-            </Tooltip>
-          </CircleMarker>
-        ))}
+        {/* Existing & User-Added Schools (Color Coded by Level) */}
+        {showMarkers && showSites && (schools || []).map(s => {
+          let markerColor = '#22c55e'; // Default Green
+          if (s.isUserAdded) {
+            markerColor = '#f59e0b'; // Amber
+          } else if (s.level === 'primary') {
+            markerColor = '#3b82f6'; // Blue
+          } else if (s.level === 'secondary') {
+            markerColor = '#22c55e'; // Green
+          } else if (s.level === 'tertiary') {
+            markerColor = '#a855f7'; // Purple
+          }
+
+          return (
+            <CircleMarker
+              key={`school-${s.id}`}
+              center={[s.lat, s.lng]}
+              radius={s.isUserAdded ? 8 : 6}
+              pathOptions={{ 
+                color: '#ffffff', 
+                fillColor: markerColor, 
+                fillOpacity: 1, 
+                weight: s.isUserAdded ? 3 : 1.5 
+              }}
+            >
+              <Tooltip>
+                <div className="font-bold flex items-center gap-2">
+                  {s.isUserAdded && <MdConstruction className="text-amber-600" />}
+                  {s.name}
+                  {s.isUserAdded && <span className="text-[8px] bg-amber-100 text-amber-700 px-1 rounded uppercase">New</span>}
+                </div>
+                <div className="text-xs text-gray-500 font-medium capitalize">
+                  {s.students.toLocaleString()} Students • {s.level} level
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          )
+        })}
 
         {/* Recommended Sites (Red Pins) - CONDITIONAL RENDERING */}
-        {showMarkers && showSites && (sites || []).map(s => (
+        {showMarkers && showSites && isAnalyzed && (sites || []).map(s => (
           <Marker
             key={`site-${s.id}`}
             position={[s.lat, s.lng]}
