@@ -26,7 +26,7 @@ export default function App() {
               <Route path="/map" element={<MapViewPage />} />
               <Route path="/districts" element={<DistrictsPage />} />
               <Route path="/schools" element={<SchoolsPage />} />
-              <Route path="/sites" element={<SitesPage />} />
+              <Route path="/sites" element={<Navigate to="/map" replace />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>

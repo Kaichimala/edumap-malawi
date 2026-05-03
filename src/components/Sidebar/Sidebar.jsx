@@ -98,6 +98,14 @@ export default function Sidebar({ isOpen, onClose }) {
           <HiOutlineLogout className="w-[18px] h-[18px] shrink-0 transition-transform group-hover:-translate-x-0.5" />
           <span>Sign Out</span>
         </button>
+
+        <div className="mt-4 px-4 py-4 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">MIS SYNC: ACTIVE</span>
+          </div>
+          <p className="text-[9px] text-slate-400 font-medium">v1.2.4-stable</p>
+        </div>
       </div>
     </aside>
   )
