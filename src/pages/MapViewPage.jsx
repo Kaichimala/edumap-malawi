@@ -28,6 +28,7 @@ export default function MapViewPage() {
   const [isBuildMode, setIsBuildMode] = useState(false)
   const [isDestroyMode, setIsDestroyMode] = useState(false)
   const [showSites, setShowSites] = useState(true)
+  const [visibleLevels, setVisibleLevels] = useState(['primary']) // Multi-level toggle state
 
   // Track the level that was last analyzed (to detect real changes)
   const analyzedLevelRef = useRef(null)
@@ -49,6 +50,8 @@ export default function MapViewPage() {
     setShowSites(false)
     clearAnalysisSites()
     analyzedLevelRef.current = null
+    // Also reset to the very beginning (pre-district selection)
+    setSelectedDistrictId(null)
   }
 
   // When district changes, clear old analysis
@@ -85,12 +88,16 @@ export default function MapViewPage() {
       {/* Center: Map */}
       <div className="flex-1 relative group">
         <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-          {/* Floating Level Toggle */}
+          {/* Floating Level Toggle (Primary Selector) */}
           <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-xl shadow-xl flex gap-1 border border-white/50">
             {['primary', 'secondary', 'tertiary'].map(l => (
               <button
                 key={l}
-                onClick={() => setLevel(l)}
+                onClick={() => {
+                  setLevel(l);
+                  // Also ensure it's visible in the legend toggle
+                  if (!visibleLevels.includes(l)) setVisibleLevels([...visibleLevels, l]);
+                }}
                 className={`px-4 py-1.5 text-[10px] font-black rounded-lg capitalize transition-all tracking-widest ${
                   level === l ? 'bg-[#1a5276] text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
                 }`}
@@ -100,47 +107,70 @@ export default function MapViewPage() {
             ))}
           </div>
           
-          {/* Map Legend */}
-          <div className="bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-xl border border-white/50 w-full flex flex-col gap-2">
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-100 pb-1 mb-1">Map Legend</h4>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500 border border-white shadow-sm"></div>
-              <span className="text-xs font-semibold text-slate-600">Primary</span>
+          {/* Unified Map Legend & Context */}
+          <div className="bg-white/95 backdrop-blur-md p-3 rounded-2xl shadow-2xl border border-white/50 w-[200px] flex flex-col gap-2.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-0.5">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Infrastructure Key</h4>
+              <button 
+                onClick={() => setVisibleLevels(visibleLevels.length === 3 ? [level] : ['primary', 'secondary', 'tertiary'])}
+                className="text-[9px] font-black text-blue-600 hover:underline uppercase tracking-tighter"
+              >
+                {visibleLevels.length === 3 ? 'Reset' : 'Show All'}
+              </button>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500 border border-white shadow-sm"></div>
-              <span className="text-xs font-semibold text-slate-600">Secondary</span>
+            
+            {/* Institution Markers with Toggles */}
+            <div className="space-y-1.5">
+              {[
+                { id: 'primary', label: 'Primary Schools', color: 'bg-blue-500' },
+                { id: 'secondary', label: 'Secondary Schools', color: 'bg-green-500' },
+                { id: 'tertiary', label: 'Tertiary Institutions', color: 'bg-purple-500' }
+              ].map(item => (
+                <div 
+                  key={item.id} 
+                  className={`flex items-center justify-between group cursor-pointer p-1 rounded-lg transition-colors ${visibleLevels.includes(item.id) ? 'bg-slate-50' : 'opacity-40 grayscale hover:grayscale-0'}`}
+                  onClick={() => {
+                    if (visibleLevels.includes(item.id)) {
+                      if (visibleLevels.length > 1) setVisibleLevels(visibleLevels.filter(v => v !== item.id));
+                    } else {
+                      setVisibleLevels([...visibleLevels, item.id]);
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm shrink-0 ${item.color}`}></div>
+                    <span className="text-[11px] font-bold text-slate-600">{item.label}</span>
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    readOnly 
+                    checked={visibleLevels.includes(item.id)} 
+                    className="w-3 h-3 accent-[#1a5276]"
+                  />
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500 border border-white shadow-sm"></div>
-              <span className="text-xs font-semibold text-slate-600">Tertiary</span>
-            </div>
+
+            {/* Analysis Overlay Info */}
             {showSites && isAnalyzed && (() => {
               const siteCount = analysisSites?.[level]?.length || 0;
-              const limit = analysisSites?.limits?.[level] || siteCount;
-              const pop = level === 'primary' ? selectedDistrict?.p_age_pop
-                        : level === 'secondary' ? selectedDistrict?.s_age_pop
-                        : selectedDistrict?.t_age_pop;
-              const inst = analysisSites?.[level === 'primary' ? 'primary' : level === 'secondary' ? 'secondary' : 'tertiary']?.length || 0;
-              // Use the need level from live score so badge matches detail panel
-              const score = calcScore(pop, siteCount > 0 ? Math.max(1, (analysisSites?.limits?.[level] || 3) - siteCount) : 1, level);
+              const pop = level === 'primary' ? selectedDistrict?.p_age_pop : level === 'secondary' ? selectedDistrict?.s_age_pop : selectedDistrict?.t_age_pop;
               const need = getNeedLevel(calcScore(pop, siteCount, level));
+              
               return (
-                <div className="pt-1 mt-1 border-t border-slate-100 space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-red-500 shadow-sm flex items-center justify-center">
+                <div className="pt-2 mt-0.5 border-t border-slate-100 space-y-2">
+                   <div className="flex items-center gap-2.5">
+                    <div className="w-3 h-3 rounded bg-red-500 shadow-sm flex items-center justify-center shrink-0">
                       <div className="w-1 h-1 bg-white rounded-full"></div>
                     </div>
-                    <span className="text-xs font-bold text-red-600 capitalize">
-                      {siteCount} {level} Site{siteCount !== 1 ? 's' : ''} Recommended
+                    <span className="text-[11px] font-black text-red-600">
+                      {siteCount} Recommended Site{siteCount !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: need.color + '20', color: need.color }}
-                    >
-                      {need.label} Need
+                  <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Need Level</span>
+                    <span className="text-[10px] font-black uppercase tracking-tighter" style={{ color: need.color }}>
+                      {need.label}
                     </span>
                   </div>
                 </div>
@@ -174,6 +204,7 @@ export default function MapViewPage() {
           isDestroyMode={isDestroyMode}
           setIsDestroyMode={setIsDestroyMode}
           isAnalyzed={isAnalyzed}
+          visibleLevels={visibleLevels} // Pass visibility array
         />
       </div>
 
