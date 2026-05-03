@@ -83,19 +83,46 @@ export default function MapViewPage() {
 
       {/* Center: Map */}
       <div className="flex-1 relative group">
-        {/* Floating Level Toggle */}
-        <div className="absolute top-4 right-4 z-[1000] bg-white/80 backdrop-blur-md p-1.5 rounded-xl shadow-xl flex gap-1 border border-white/50">
-          {['primary', 'secondary', 'tertiary'].map(l => (
-            <button
-              key={l}
-              onClick={() => setLevel(l)}
-              className={`px-4 py-1.5 text-[10px] font-black rounded-lg capitalize transition-all tracking-widest ${
-                level === l ? 'bg-[#1a5276] text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              {l}
-            </button>
-          ))}
+        <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+          {/* Floating Level Toggle */}
+          <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-xl shadow-xl flex gap-1 border border-white/50">
+            {['primary', 'secondary', 'tertiary'].map(l => (
+              <button
+                key={l}
+                onClick={() => setLevel(l)}
+                className={`px-4 py-1.5 text-[10px] font-black rounded-lg capitalize transition-all tracking-widest ${
+                  level === l ? 'bg-[#1a5276] text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          
+          {/* Map Legend */}
+          <div className="bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-xl border border-white/50 w-full flex flex-col gap-2">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-100 pb-1 mb-1">Map Legend</h4>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500 border border-white shadow-sm"></div>
+              <span className="text-xs font-semibold text-slate-600">Primary</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500 border border-white shadow-sm"></div>
+              <span className="text-xs font-semibold text-slate-600">Secondary</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500 border border-white shadow-sm"></div>
+              <span className="text-xs font-semibold text-slate-600">Tertiary</span>
+            </div>
+            {showSites && isAnalyzed && (
+              <div className="flex items-center gap-2 pt-1 mt-1 border-t border-slate-100">
+                <div className="w-3 h-3 rounded bg-red-500 shadow-sm flex items-center justify-center">
+                  <div className="w-1 h-1 bg-white rounded-full"></div>
+                </div>
+                <span className="text-xs font-bold text-red-600">Recommended Site</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <MapView
