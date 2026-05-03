@@ -3,13 +3,18 @@ import { useDistricts } from '../hooks/useDistricts'
 import { useSchools } from '../hooks/useSchools'
 
 export default function SchoolsPage() {
-  const { districts } = useDistricts()
-  const [selectedDistrictId, setSelectedDistrictId] = useState('')
-  const { schools, loading } = useSchools(selectedDistrictId || null)
+  const { 
+    schools, 
+    loading, 
+    districts,
+    selectedDistrictId,
+    setSelectedDistrictId 
+  } = useSchools()
+  
   const [search, setSearch] = useState('')
 
-  const filteredSchools = schools.filter(s => 
-    s.name.toLowerCase().includes(search.toLowerCase())
+  const filteredSchools = (schools || []).filter(s => 
+    s && s.name && s.name.toLowerCase().includes(search.toLowerCase())
   )
 
   return (

@@ -4,10 +4,15 @@ import { useSites } from '../hooks/useSites'
 import { HiOutlineLocationMarker, HiOutlineDatabase, HiOutlineChevronRight } from 'react-icons/hi'
 
 export default function SitesPage() {
-  const { districts } = useDistricts()
-  const [selectedDistrictId, setSelectedDistrictId] = useState('')
-  const [level, setLevel] = useState('primary')
-  const { sites, loading } = useSites(selectedDistrictId || null, level)
+  const { 
+    sites, 
+    loading, 
+    districts,
+    selectedDistrictId, 
+    setSelectedDistrictId,
+    level, 
+    setLevel 
+  } = useSites()
   
   // Persist session analysis state
   const [isAnalyzed, setIsAnalyzed] = useState(() => {

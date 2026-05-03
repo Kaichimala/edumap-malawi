@@ -6,9 +6,17 @@ import { useState, useEffect } from 'react'
 import { HiOutlineChartBar, HiOutlineCheckCircle, HiOutlineRefresh } from 'react-icons/hi'
 
 export default function MapViewPage() {
-  const { districts, loading } = useDistricts()
-  const [selectedDistrict, setSelectedDistrict] = useState(null)
-  const [level, setLevel] = useState('primary')
+  const { 
+    districts, 
+    loading, 
+    selectedDistrictId, 
+    setSelectedDistrictId, 
+    level, 
+    setLevel 
+  } = useDistricts()
+
+  const selectedDistrict = districts.find(d => String(d.id) === String(selectedDistrictId))
+  const handleSelect = (d) => setSelectedDistrictId(d ? d.id : null)
   
   // Persist session analysis state
   const [isAnalyzed, setIsAnalyzed] = useState(() => {
@@ -61,7 +69,7 @@ export default function MapViewPage() {
         districts={districts}
         level={level}
         selectedDistrict={selectedDistrict}
-        onSelect={setSelectedDistrict}
+        onSelect={handleSelect}
         isBuildMode={isBuildMode}
         setIsBuildMode={setIsBuildMode}
         isDestroyMode={isDestroyMode}
@@ -95,7 +103,7 @@ export default function MapViewPage() {
           districts={districts}
           selectedDistrict={selectedDistrict}
           level={level}
-          onSelect={setSelectedDistrict}
+          onSelect={handleSelect}
           showMarkers={true}
           showSites={showSites}
           isBuildMode={isBuildMode}
@@ -141,7 +149,7 @@ export default function MapViewPage() {
         <DetailPanel
           district={selectedDistrict}
           level={level}
-          onClose={() => setSelectedDistrict(null)}
+          onClose={() => handleSelect(null)}
         />
       )}
     </div>
