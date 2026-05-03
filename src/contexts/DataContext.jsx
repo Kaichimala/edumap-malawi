@@ -134,6 +134,72 @@ export function DataProvider({ children }) {
     }
   }, [])
 
+  // --- Spatial Helpers ---
+  const hav = (lat1, lng1, lat2, lng2) => {
+    const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
+  const getTerrainSuitability = useCallback((lat, lng) => {
+    // 1. National Water Bodies (Lake Malawi, Malombe, Chilwa, Chiuta)
+    const isInLakeMalawi = (lng > 33.9 && lng < 35.3 && lat > -14.5); // Broad North/Central Lake
+    const isInLakeMalombe = (lng > 35.1 && lng < 35.3 && lat < -14.5 && lat > -14.9);
+    const isInLakeChilwa = (lng > 35.5 && lng < 35.9 && lat < -15.0 && lat > -15.6);
+    if (isInLakeMalawi || isInLakeMalombe || isInLakeChilwa) {
+      return { excluded: true, reason: 'Water Body (Lake)' };
+    }
+    
+    // 2. High Altitude / Steep Highlands (Nyika, Viphya, Mulanje, Dedza)
+    const distToNyika = hav(lat, lng, -10.6, 33.8);
+    if (distToNyika < 25) return { excluded: true, reason: 'High Altitude / Rugged (Nyika)' };
+
+    const distToViphya = hav(lat, lng, -11.8, 33.9);
+    if (distToViphya < 20) return { excluded: true, reason: 'Rugged Terrain (Viphya Highlands)' };
+
+    const distToDedza = hav(lat, lng, -14.35, 34.3);
+    if (distToDedza < 10) return { excluded: true, reason: 'Steep Slope (Dedza Highlands)' };
+
+    const distToMulanje = hav(lat, lng, -15.95, 35.6);
+    if (distToMulanje < 15) return { excluded: true, reason: 'Steep Slope (Mulanje Massif)' };
+
+    const distToZomba = hav(lat, lng, -15.35, 35.3);
+    if (distToZomba < 6) return { excluded: true, reason: 'Steep Slope (Zomba Plateau)' };
+
+    // 3. National Protected Areas (Parks & Reserves)
+    const isInKasungu = (lng > 33.0 && lng < 33.3 && lat < -12.7 && lat > -13.2);
+    if (isInKasungu) return { excluded: true, reason: 'Protected Area (Kasungu NP)' };
+
+    const isInNkhotakota = (lng > 33.9 && lng < 34.3 && lat < -12.6 && lat > -13.1);
+    if (isInNkhotakota) return { excluded: true, reason: 'Protected Area (Nkhotakota WR)' };
+
+    const isInLiwonde = (lng > 35.15 && lng < 35.45 && lat < -14.65 && lat > -15.15);
+    if (isInLiwonde) return { excluded: true, reason: 'Protected Area (Liwonde NP)' };
+    
+    const isInMangochiFR = (lng > 35.35 && lng < 35.55 && lat < -14.25 && lat > -14.65);
+    if (isInMangochiFR) return { excluded: true, reason: 'Protected Area (Forest Reserve)' };
+
+    // Dzalanyama/Lilongwe West Highlands & Wetlands - HARDENED
+    const isInLilongweWetland = (lng > 33.3 && lng < 33.75 && lat < -13.9 && lat > -14.5);
+    if (isInLilongweWetland) return { excluded: true, reason: 'Wetland/Forest (Lilongwe West)' };
+    
+    const isInChilwaSwamp = (lng > 35.45 && lng < 35.95 && lat < -14.7 && lat > -15.6);
+    if (isInChilwaSwamp) return { excluded: true, reason: 'Marshland (Chilwa Basin)' };
+
+    // 4. Major Wetlands & Marshes
+    const isInElephantMarsh = (lng > 34.75 && lng < 35.15 && lat < -16.0 && lat > -16.6);
+    if (isInElephantMarsh) return { excluded: true, reason: 'Wetland (Elephant Marsh)' };
+
+    // Hazard Risk (General Flood plains)
+    const isFloodProne = (lat < -16.0 && lng < 35.2);
+    
+    return { 
+      excluded: false, 
+      hazardRisk: isFloodProne ? 'High' : 'Low',
+      growthZone: (lng > 35.0 && lng < 35.5) ? 1.2 : 1.0 
+    };
+  }, []);
+
   const runSpatialAnalysis = useCallback(async (districtId, districtData) => {
     // ONE GRID SWEEP — computes Primary, Secondary, Tertiary sites simultaneously.
     // Avoids re-running when the user toggles levels.
@@ -219,13 +285,6 @@ export function DataProvider({ children }) {
         minLng = (districtData?.lng || 34)  - 0.5; maxLng = (districtData?.lng || 34)  + 0.5;
       }
 
-      // 5. Haversine
-      const hav = (lat1, lng1, lat2, lng2) => {
-        const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
-        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      };
-
       // 6. Boundary verts for interior scoring
       const bVerts = rings ? rings.flat() : [];
       const distToBoundary = (lat, lng) => {
@@ -233,75 +292,6 @@ export function DataProvider({ children }) {
         let min = Infinity;
         for (const [bLng, bLat] of bVerts) { const d = hav(lat, lng, bLat, bLng); if (d < min) min = d; }
         return min;
-      };
-
-      // 6b. NESIP Criteria Helpers
-      // Since we don't have full raster data, we simulate terrain/hazard risk 
-      // using spatial probability (e.g., proximity to certain longitudes/latitudes 
-      // known for mountains or flood plains in Malawi)
-      // 6b. NESIP Criteria Helpers
-      // 6b. NESIP Criteria Helpers
-      const getTerrainSuitability = (lat, lng) => {
-        // 1. National Water Bodies (Lake Malawi, Malombe, Chilwa, Chiuta)
-        const isInLakeMalawi = (lng > 33.9 && lng < 35.3 && lat > -14.5); // Broad North/Central Lake
-        const isInLakeMalombe = (lng > 35.1 && lng < 35.3 && lat < -14.5 && lat > -14.9);
-        const isInLakeChilwa = (lng > 35.5 && lng < 35.9 && lat < -15.0 && lat > -15.6);
-        if (isInLakeMalawi || isInLakeMalombe || isInLakeChilwa) {
-          return { excluded: true, reason: 'Water Body (Lake)' };
-        }
-        
-        // 2. High Altitude / Steep Highlands (Nyika, Viphya, Mulanje, Dedza)
-        // Nyika Plateau (North)
-        const distToNyika = hav(lat, lng, -10.6, 33.8);
-        if (distToNyika < 25) return { excluded: true, reason: 'High Altitude / Rugged (Nyika)' };
-
-        // Viphya Highlands (Mzimba/Nkhata Bay)
-        const distToViphya = hav(lat, lng, -11.8, 33.9);
-        if (distToViphya < 20) return { excluded: true, reason: 'Rugged Terrain (Viphya Highlands)' };
-
-        // Dedza/Ntcheu Mountains
-        const distToDedza = hav(lat, lng, -14.35, 34.3);
-        if (distToDedza < 10) return { excluded: true, reason: 'Steep Slope (Dedza Highlands)' };
-
-        // Mulanje Massif (South)
-        const distToMulanje = hav(lat, lng, -15.95, 35.6);
-        if (distToMulanje < 15) return { excluded: true, reason: 'Steep Slope (Mulanje Massif)' };
-
-        // Zomba Plateau
-        const distToZomba = hav(lat, lng, -15.35, 35.3);
-        if (distToZomba < 6) return { excluded: true, reason: 'Steep Slope (Zomba Plateau)' };
-
-        // 3. National Protected Areas (Parks & Reserves)
-        // Kasungu National Park
-        const isInKasungu = (lng > 33.0 && lng < 33.3 && lat < -12.7 && lat > -13.2);
-        if (isInKasungu) return { excluded: true, reason: 'Protected Area (Kasungu NP)' };
-
-        // Nkhotakota Wildlife Reserve
-        const isInNkhotakota = (lng > 33.9 && lng < 34.3 && lat < -12.6 && lat > -13.1);
-        if (isInNkhotakota) return { excluded: true, reason: 'Protected Area (Nkhotakota WR)' };
-
-        // Liwonde NP & Mangochi Forest Reserves (Already Hardened)
-        const isInLiwonde = (lng > 35.15 && lng < 35.45 && lat < -14.65 && lat > -15.15);
-        if (isInLiwonde) return { excluded: true, reason: 'Protected Area (Liwonde NP)' };
-        
-        const isInMangochiFR = (lng > 35.35 && lng < 35.55 && lat < -14.25 && lat > -14.65);
-        if (isInMangochiFR) return { excluded: true, reason: 'Protected Area (Forest Reserve)' };
-
-        // 4. Major Wetlands & Marshes
-        const isInElephantMarsh = (lng > 34.75 && lng < 35.15 && lat < -16.0 && lat > -16.6);
-        if (isInElephantMarsh) return { excluded: true, reason: 'Wetland (Elephant Marsh)' };
-        
-        const isInChilwaSwamp = (lng > 35.45 && lng < 35.95 && lat < -14.7 && lat > -15.6);
-        if (isInChilwaSwamp) return { excluded: true, reason: 'Marshland (Chilwa Basin)' };
-
-        // Hazard Risk (General Flood plains)
-        const isFloodProne = (lat < -16.0 && lng < 35.2);
-        
-        return { 
-          excluded: false, 
-          hazardRisk: isFloodProne ? 'High' : 'Low',
-          growthZone: (lng > 35.0 && lng < 35.5) ? 1.2 : 1.0 
-        };
       };
 
       // 7. ONE GRID SWEEP — build candidate lists for all 3 levels simultaneously
@@ -394,6 +384,28 @@ export function DataProvider({ children }) {
     }
   }, [])
 
+  const evaluatePointSuitability = useCallback((lat, lng, targetLevel) => {
+    const terrain = getTerrainSuitability(lat, lng);
+    if (terrain.excluded) return { score: 0, reason: terrain.reason, excluded: true };
+
+    const levelSchools = schools.filter(s => s.level === targetLevel);
+    let minDist = levelSchools.length === 0 ? 10 : Infinity;
+    for (const sch of levelSchools) {
+      const d = hav(lat, lng, sch.lat, sch.lng);
+      if (d < minDist) minDist = d;
+    }
+
+    const buf = 5; // standard target catchment
+    const score = Math.min(99, Math.max(10, Math.round(50 + (minDist / buf) * 30)));
+    
+    return { 
+      score, 
+      reason: terrain.reason || (minDist < 1 ? 'Too close to existing school' : 'Suitable for development'),
+      excluded: false,
+      distance: minDist
+    };
+  }, [schools]);
+
   const clearAnalysisSites = useCallback(() => {
     setAnalysisSites({ primary: [], secondary: [], tertiary: [] });
   }, [])
@@ -422,8 +434,9 @@ export function DataProvider({ children }) {
     setLevel,
     refreshData: fetchData,
     runSpatialAnalysis,
+    evaluatePointSuitability,
     clearAnalysisSites
-  }), [districts, schools, sites, analysisSites, loading, error, selectedDistrictId, level, fetchData, runSpatialAnalysis, clearAnalysisSites])
+  }), [districts, schools, sites, analysisSites, loading, error, selectedDistrictId, level, fetchData, runSpatialAnalysis, evaluatePointSuitability, clearAnalysisSites])
 
   return (
     <DataContext.Provider value={contextValue}>

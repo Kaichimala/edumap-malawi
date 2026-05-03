@@ -199,7 +199,7 @@ export default function MapView({
   const mapRef = useRef(null)
   
   const { schools, addSchool, removeSchool, getAllSchools } = useSchools()
-  const { analysisSites } = useData()
+  const { analysisSites, evaluatePointSuitability } = useData()
 
   const handleExport = async (format) => {
     if (!mapRef.current) return
@@ -295,9 +295,35 @@ export default function MapView({
               </div>
               <div>
                 <h3 className="text-xl font-bold text-slate-800">New Infrastructure</h3>
-                <p className="text-xs text-slate-500 font-medium">Pin: {newSchoolLoc.lat.toFixed(4)}, {newSchoolLoc.lng.toFixed(4)}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-slate-500 font-medium">{newSchoolLoc.lat.toFixed(4)}, {newSchoolLoc.lng.toFixed(4)}</p>
+                  {(() => {
+                    const evalResult = evaluatePointSuitability(newSchoolLoc.lat, newSchoolLoc.lng, formState.level);
+                    return (
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${evalResult.excluded ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                        {evalResult.excluded ? 'Restricted' : `Score: ${evalResult.score}`}
+                      </span>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
+
+            {(() => {
+              const evalResult = evaluatePointSuitability(newSchoolLoc.lat, newSchoolLoc.lng, formState.level);
+              if (evalResult.excluded) {
+                return (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
+                    <div className="text-red-500 text-lg mt-0.5">⚠️</div>
+                    <div>
+                      <p className="text-xs font-bold text-red-700 uppercase tracking-tight">Environmental Warning</p>
+                      <p className="text-[10px] text-red-600 font-medium mt-1">This site is located in a <b>{evalResult.reason}</b>. Planning policy prohibits development here.</p>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <form onSubmit={handleSaveSchool} className="space-y-4">
               <div>
