@@ -11,15 +11,40 @@ export default function MapDistrictSidebar({
   isBuildMode, 
   setIsBuildMode,
   isAnalyzed,
-  isAnalyzing,
-  progress,
-  handleStartAnalysis,
+  onAnalysisComplete,
+  handleClearAnalysis,
   showSites,
   setShowSites,
   isDestroyMode,
   setIsDestroyMode
 }) {
   const [search, setSearch] = useState('')
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [progress, setProgress] = useState(0)
+
+  const handleStartAnalysis = () => {
+    setIsAnalyzing(true)
+    setProgress(0)
+    
+    const duration = 2500
+    const interval = 50
+    const steps = duration / interval
+    let currentStep = 0
+
+    const timer = setInterval(() => {
+      currentStep++
+      const p = Math.min(100, Math.round((currentStep / steps) * 100))
+      setProgress(p)
+
+      if (currentStep >= steps) {
+        clearInterval(timer)
+        setTimeout(() => {
+          setIsAnalyzing(false)
+          onAnalysisComplete()
+        }, 300)
+      }
+    }, interval)
+  }
 
   const filteredDistricts = districts.filter(d => 
     d.name.toLowerCase().includes(search.toLowerCase())
@@ -51,7 +76,7 @@ export default function MapDistrictSidebar({
       <div className="p-4 bg-slate-50/80 border-b border-slate-100 space-y-3">
         <div className="flex justify-between items-center">
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Spatial Engine</h3>
-          {isAnalyzed && (
+          {isAnalyzed && selectedDistrict && (
             <button
               onClick={() => setShowSites(!showSites)}
               className={`p-1 rounded-md transition-colors ${showSites ? 'text-[#1a5276] hover:bg-blue-50' : 'text-slate-400 hover:bg-slate-100'}`}
@@ -61,7 +86,13 @@ export default function MapDistrictSidebar({
           )}
         </div>
         
-        {isAnalyzing ? (
+        {!selectedDistrict ? (
+          <div className="flex flex-col items-center justify-center p-4 bg-slate-100/50 rounded-xl border border-slate-200 border-dashed text-center">
+            <HiOutlineSearch className="text-2xl text-slate-300 mb-2" />
+            <p className="text-[10px] font-black uppercase tracking-tight text-slate-500">Engine Locked</p>
+            <p className="text-[9px] text-slate-400 font-medium mt-1">Select a district below to unlock spatial analysis.</p>
+          </div>
+        ) : isAnalyzing ? (
           <div className="space-y-2">
             <div className="flex justify-between text-[10px] font-bold text-[#1a5276] uppercase tracking-tighter">
               <span>{progress < 100 ? 'Processing...' : 'Complete'}</span>
@@ -78,15 +109,23 @@ export default function MapDistrictSidebar({
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-[#1a5276] rounded-lg border border-blue-100">
             <HiOutlineCheckCircle className="text-xl shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-tight leading-none">Dataset Calibrated</p>
+              <p className="text-[10px] font-black uppercase tracking-tight leading-none">{selectedDistrict.name} Calibrated</p>
               <p className="text-[9px] font-medium opacity-80 mt-0.5 truncate">Planning sites ready</p>
             </div>
-            <button 
-              onClick={handleStartAnalysis} 
-              className="text-[9px] font-bold text-[#1a5276] hover:underline"
-            >
-              Re-run
-            </button>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <button 
+                onClick={handleStartAnalysis} 
+                className="text-[9px] font-bold text-[#1a5276] hover:underline"
+              >
+                Re-run
+              </button>
+              <button 
+                onClick={handleClearAnalysis} 
+                className="text-[9px] font-bold text-red-500 hover:underline"
+              >
+                Clear
+              </button>
+            </div>
           </div>
         ) : (
           <button
@@ -94,7 +133,7 @@ export default function MapDistrictSidebar({
             className="w-full py-2.5 bg-[#1a5276] text-white text-[11px] font-black rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2 active:scale-95 uppercase tracking-wider"
           >
             <HiOutlineChartBar className="text-lg" />
-            Run Analysis
+            Analyze {selectedDistrict.name}
           </button>
         )}
       </div>

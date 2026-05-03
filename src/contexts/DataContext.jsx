@@ -21,13 +21,25 @@ export function DataProvider({ children }) {
         .select('*')
         .order('name', { ascending: true })
 
+      const { data: boundsData } = await supabase
+        .from('v_district_boundaries')
+        .select('name, geojson')
+
       if (sbError) throw sbError
+
+      const boundsMap = {};
+      if (boundsData) {
+        boundsData.forEach(b => {
+          if (b.name && b.geojson) boundsMap[b.name.toLowerCase()] = b.geojson;
+        });
+      }
 
       const safeDistricts = (data || [])
         .map(d => ({
           ...d,
           lat: Number(d.lat),
-          lng: Number(d.lng)
+          lng: Number(d.lng),
+          geojson: boundsMap[d.name?.toLowerCase()] || null
         }))
         .filter(d => !isNaN(d.lat) && !isNaN(d.lng) && d.lat !== 0 && d.lng !== 0)
 
