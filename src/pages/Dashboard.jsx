@@ -18,6 +18,7 @@ export default function Dashboard() {
   const totalSchools = districts.reduce((acc, d) => 
     acc + (Number(d.p_schools) || 0) + (Number(d.s_schools) || 0) + (Number(d.t_institutions) || 0), 0)
   const totalDistricts = districts.length
+  const totalPopulation = districts.reduce((acc, d) => acc + (Number(d.total_population) || 0), 0)
   const criticalDistricts = districts.filter(d => calcScore(Number(d.p_age_pop) || 0, Number(d.p_schools) || 0, 'primary') >= 80)
   
   // Data for Bar Chart: Top 10 Need Scores
@@ -44,7 +45,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Total Schools" value={totalSchools.toLocaleString()} subValue="Facility Inventory" icon="🏫" />
         <StatCard title="Total Districts" value={totalDistricts} subValue="Administrative Units" icon="🇲🇼" />
-        <StatCard title="Population Coverage" value="68.4%" subValue="Service Area Mapping" icon="👥" color="text-green-600" />
+        <StatCard title="Total Population" value={totalPopulation.toLocaleString()} subValue="National Census Data" icon="👥" color="text-green-600" />
         <StatCard title="Recommended Sites" value="142" subValue="Planning Pointers" icon="📍" />
       </div>
 

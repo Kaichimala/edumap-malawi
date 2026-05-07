@@ -6,6 +6,7 @@ import { useSchools } from '../../hooks/useSchools'
 const STAT_ICONS = {
   inst:  <HiOutlineOfficeBuilding className="w-5 h-5 text-brand-500" />,
   site:  <HiOutlineLocationMarker className="w-5 h-5 text-red-500"   />,
+  pop:   <HiOutlineUsers className="w-5 h-5 text-blue-500" />,
 }
 
 export default function DetailPanel({ district, level, onClose }) {
@@ -49,6 +50,7 @@ export default function DetailPanel({ district, level, onClose }) {
 
       {/* Stats */}
       <div className="px-5 pb-5 space-y-3">
+        <StatCard icon={STAT_ICONS.pop} label="Total Population" value={district.total_population?.toLocaleString() || 'N/A'} />
         <StatCard icon={STAT_ICONS.inst}  label={`Existing ${instLabel}`} value={inst} />
         <StatCard
           icon={STAT_ICONS.site}
