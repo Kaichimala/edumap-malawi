@@ -2,6 +2,7 @@ import { calcScore, getNeedLevel, getRecommendedNew } from '../../utils/scoring'
 import { HiOutlineUsers, HiOutlineOfficeBuilding, HiOutlineChartBar, HiOutlineLocationMarker } from 'react-icons/hi'
 import { IoClose } from 'react-icons/io5'
 import { useSchools } from '../../hooks/useSchools'
+import { useState, useEffect } from 'react'
 
 const STAT_ICONS = {
   pop:   <HiOutlineUsers className="w-5 h-5 text-indigo-500" />,
@@ -26,9 +27,40 @@ export default function DetailPanel({ district, level, onClose }) {
   const newInst = getRecommendedNew(pop, inst, level)
   const instLabel = level === 'tertiary' ? 'Institutions' : 'Schools'
 
-  return (
-    <div className="w-80 bg-white h-full overflow-y-auto border-l border-slate-200 shadow-xl flex flex-col">
+  // Drag state
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
 
+  const handleMouseDown = (e) => {
+    setDragging(true);
+    setOffset({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!dragging) return;
+    setPosition({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+  };
+
+  const handleMouseUp = () => {
+    setDragging(false);
+  };
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragging, offset]);
+
+  return (
+    <div
+      className="w-80 bg-white h-full overflow-y-auto border-l border-slate-200 shadow-xl flex flex-col cursor-move z-50"
+      style={{ position: 'absolute', left: position.x, top: position.y }}
+      onMouseDown={handleMouseDown}
+    >
       {/* Accent bar shifted to neutral */}
       <div className="h-1.5 w-full bg-slate-200" />
 
