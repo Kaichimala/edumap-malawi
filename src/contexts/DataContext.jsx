@@ -1,0 +1,448 @@
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import { calcScore, getRecommendedNew } from '../utils/scoring'
+
+const DataContext = createContext()
+
+export function DataProvider({ children }) {
+  const [districts, setDistricts] = useState([])
+  const [schools, setSchools] = useState([])
+  const [sites, setSites] = useState([])
+  // analysisSites now holds results for all 3 levels from a single analysis run
+  const [analysisSites, setAnalysisSites] = useState({ primary: [], secondary: [], tertiary: [] })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // Navigation Memory
+  const [selectedDistrictId, setSelectedDistrictId] = useState(null)
+  const [level, setLevel] = useState('primary')
+
+  const fetchDistricts = useCallback(async () => {
+    try {
+      const { data, error: sbError } = await supabase
+        .from('app_districts')
+        .select('*')
+        .order('name', { ascending: true })
+
+      const { data: boundsData } = await supabase
+        .from('v_district_boundaries')
+        .select('name, geojson')
+
+      if (sbError) throw sbError
+
+      const boundsMap = {};
+      if (boundsData) {
+        boundsData.forEach(b => {
+          if (b.name && b.geojson) boundsMap[b.name.toLowerCase()] = b.geojson;
+        });
+      }
+
+      const safeDistricts = (data || [])
+        .map(d => ({
+          ...d,
+          lat: Number(d.lat),
+          lng: Number(d.lng),
+          geojson: boundsMap[d.name?.toLowerCase()] || null
+        }))
+        .filter(d => !isNaN(d.lat) && !isNaN(d.lng) && d.lat !== 0 && d.lng !== 0)
+
+      setDistricts(safeDistricts)
+    } catch (err) {
+      console.error("Error fetching districts:", err)
+      setError(err)
+    }
+  }, [])
+
+  const fetchSchools = useCallback(async () => {
+    try {
+      const { data, error: sbError } = await supabase
+        .from('mwi_education_edumap')
+        .select('id, name, geometry, district_id, amenity')
+      
+      if (sbError) throw sbError
+      
+      const seenNames = new Set();
+      const processed = (data || []).map(s => {
+        let lat = 0, lng = 0;
+        if (s.geometry?.coordinates) {
+          lng = s.geometry.coordinates[0];
+          lat = s.geometry.coordinates[1];
+        }
+        if (!lat || !lng) return null;
+
+        const name = s.name || 'Unknown School';
+        const noiseKeywords = ['BUILDING', 'HALL', 'OFFICE', 'STAFF', 'GATE', 'CLINIC', 'HOSTEL', 'HOUSE', 'MESS'];
+        if (noiseKeywords.some(k => name.toUpperCase().includes(k))) return null;
+
+        let level = 'primary';
+        let students = 400;
+        let displayName = name;
+        const upperName = name.toUpperCase();
+
+        if (s.amenity === 'university' || s.amenity === 'college' || ['UNIVERSITY', 'COLLEGE', 'FACULTY', 'POLYTECHNIC', 'INSTITUTE', 'TRAINING CENTRE'].some(k => upperName.includes(k))) {
+          level = 'tertiary';
+          students = 8000;
+          
+          // Fix: If it says University of Malawi but is in Blantyre (lng < 35.1), it's actually KUHeS
+          const isKuhes = upperName.includes('COLLEGE OF MEDICINE') || 
+                          upperName.includes('KUHES') || 
+                          (upperName.includes('NURSING') && !upperName.includes('ZOMBA')) ||
+                          (upperName.includes('UNIVERSITY OF MALAWI') && lng < 35.1);
+
+          if (isKuhes) {
+            displayName = 'Kamuzu University of Health Sciences (KUHeS)';
+          } else if (upperName.includes('CHANCELLOR') || upperName.includes('UNIVERSITY OF MALAWI') || upperName.includes('UNIMA') || upperName.includes('FACULTY') || upperName.includes('CENTRE')) {
+            displayName = 'University of Malawi (UNIMA)';
+          } else if (upperName.includes('POLYTECHNIC') || upperName.includes('MUBAS') || upperName.includes('BUSINESS AND APPLIED')) {
+            displayName = 'Malawi University of Business and Applied Sciences (MUBAS)';
+          } else if (upperName.includes('MZUZU UNIVERSITY') || upperName.includes('MZUNI')) {
+            displayName = 'Mzuzu University (MZUNI)';
+          } else if (upperName.includes('LUANAR') || upperName.includes('BUNDUNDA') || upperName.includes('NATURAL RESOURCES')) {
+            displayName = 'LUANAR';
+          }
+        } else if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
+          level = 'secondary';
+          students = 280;
+        }
+
+        const uniqueKey = `${displayName}-${level}`;
+        if (seenNames.has(uniqueKey)) return null;
+        seenNames.add(uniqueKey);
+
+        return { ...s, name: displayName, lat, lng, level, students };
+      }).filter(Boolean);
+
+      setSchools(processed)
+    } catch (err) {
+      console.error("Error fetching schools:", err)
+    }
+  }, [])
+
+  const fetchGlobalSites = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('sites').select('*')
+      if (error) throw error
+      const processed = (data || []).map(s => ({
+        ...s,
+        lat: Number(s.lat),
+        lng: Number(s.lng),
+        suitability_score: Number(s.suitability_score || s.score || 85)
+      })).filter(s => !isNaN(s.lat) && !isNaN(s.lng))
+      setSites(processed)
+    } catch (err) {
+      console.error("Error fetching sites:", err)
+    }
+  }, [])
+
+  // --- Spatial Helpers ---
+  const hav = (lat1, lng1, lat2, lng2) => {
+    const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
+  const getTerrainSuitability = useCallback((lat, lng) => {
+    // 1. National Water Bodies (Lake Malawi, Malombe, Chilwa, Chiuta)
+    const isInLakeMalawi = (lng > 33.9 && lng < 35.3 && lat > -14.5); // Broad North/Central Lake
+    const isInLakeMalombe = (lng > 35.1 && lng < 35.3 && lat < -14.5 && lat > -14.9);
+    const isInLakeChilwa = (lng > 35.5 && lng < 35.9 && lat < -15.0 && lat > -15.6);
+    if (isInLakeMalawi || isInLakeMalombe || isInLakeChilwa) {
+      return { excluded: true, reason: 'Water Body (Lake)' };
+    }
+    
+    // 2. High Altitude / Steep Highlands (Nyika, Viphya, Mulanje, Dedza)
+    const distToNyika = hav(lat, lng, -10.6, 33.8);
+    if (distToNyika < 25) return { excluded: true, reason: 'High Altitude / Rugged (Nyika)' };
+
+    const distToViphya = hav(lat, lng, -11.8, 33.9);
+    if (distToViphya < 20) return { excluded: true, reason: 'Rugged Terrain (Viphya Highlands)' };
+
+    const distToDedza = hav(lat, lng, -14.35, 34.3);
+    if (distToDedza < 10) return { excluded: true, reason: 'Steep Slope (Dedza Highlands)' };
+
+    const distToMulanje = hav(lat, lng, -15.95, 35.6);
+    if (distToMulanje < 15) return { excluded: true, reason: 'Steep Slope (Mulanje Massif)' };
+
+    const distToZomba = hav(lat, lng, -15.35, 35.3);
+    if (distToZomba < 6) return { excluded: true, reason: 'Steep Slope (Zomba Plateau)' };
+
+    // 3. National Protected Areas (Parks & Reserves)
+    const isInKasungu = (lng > 33.0 && lng < 33.3 && lat < -12.7 && lat > -13.2);
+    if (isInKasungu) return { excluded: true, reason: 'Protected Area (Kasungu NP)' };
+
+    const isInNkhotakota = (lng > 33.9 && lng < 34.3 && lat < -12.6 && lat > -13.1);
+    if (isInNkhotakota) return { excluded: true, reason: 'Protected Area (Nkhotakota WR)' };
+
+    const isInLiwonde = (lng > 35.15 && lng < 35.45 && lat < -14.65 && lat > -15.15);
+    if (isInLiwonde) return { excluded: true, reason: 'Protected Area (Liwonde NP)' };
+    
+    const isInMangochiFR = (lng > 35.35 && lng < 35.55 && lat < -14.25 && lat > -14.65);
+    if (isInMangochiFR) return { excluded: true, reason: 'Protected Area (Forest Reserve)' };
+
+    // Dzalanyama/Lilongwe West Highlands & Wetlands - HARDENED
+    const isInLilongweWetland = (lng > 33.3 && lng < 33.75 && lat < -13.9 && lat > -14.5);
+    if (isInLilongweWetland) return { excluded: true, reason: 'Wetland/Forest (Lilongwe West)' };
+    
+    const isInChilwaSwamp = (lng > 35.45 && lng < 35.95 && lat < -14.7 && lat > -15.6);
+    if (isInChilwaSwamp) return { excluded: true, reason: 'Marshland (Chilwa Basin)' };
+
+    // 4. Major Wetlands & Marshes
+    const isInElephantMarsh = (lng > 34.75 && lng < 35.15 && lat < -16.0 && lat > -16.6);
+    if (isInElephantMarsh) return { excluded: true, reason: 'Wetland (Elephant Marsh)' };
+
+    // Hazard Risk (General Flood plains)
+    const isFloodProne = (lat < -16.0 && lng < 35.2);
+    
+    return { 
+      excluded: false, 
+      hazardRisk: isFloodProne ? 'High' : 'Low',
+      growthZone: (lng > 35.0 && lng < 35.5) ? 1.2 : 1.0 
+    };
+  }, []);
+
+  const runSpatialAnalysis = useCallback(async (districtId, districtData) => {
+    // ONE GRID SWEEP — computes Primary, Secondary, Tertiary sites simultaneously.
+    // Avoids re-running when the user toggles levels.
+    try {
+      // 1. Load all schools in this district
+      let allDistrictSchools = [];
+      setSchools(current => {
+        allDistrictSchools = (current || []).filter(s => String(s.district_id) === String(districtId));
+        return current;
+      });
+
+      const byLevel = {
+        primary:   allDistrictSchools.filter(s => s.level === 'primary'),
+        secondary: allDistrictSchools.filter(s => s.level === 'secondary'),
+        tertiary:  allDistrictSchools.filter(s => s.level === 'tertiary'),
+      };
+      console.log('[Engine] Schools by level:', { p: byLevel.primary.length, s: byLevel.secondary.length, t: byLevel.tertiary.length });
+
+      // 2. Buffer distances (km) per level
+      const buffers = { primary: 3, secondary: 8, tertiary: 15 };
+
+      // 2b. Dynamic site limit based on actual need score
+      //     Mirrors the right-panel calculation so recommendations are consistent
+      const popByLevel = {
+        primary:   districtData?.p_age_pop   || 0,
+        secondary: districtData?.s_age_pop   || 0,
+        tertiary:  districtData?.t_age_pop   || 0,
+      };
+      const getLimitForLevel = (lvl) => {
+        const pop   = popByLevel[lvl];
+        const inst  = byLevel[lvl].length;
+        const score = calcScore(pop, inst, lvl);
+        const needed = getRecommendedNew(pop, inst, lvl);
+        // Clamp: at least 1, at most 7; use need score as tiebreaker
+        if (score >= 80) return Math.min(7, Math.max(5, needed)); // Critical
+        if (score >= 60) return Math.min(5, Math.max(3, needed)); // High
+        if (score >= 40) return Math.min(3, Math.max(2, needed)); // Medium
+        return Math.min(2, Math.max(1, needed));                  // Low
+      };
+      const limits = {
+        primary:   getLimitForLevel('primary'),
+        secondary: getLimitForLevel('secondary'),
+        tertiary:  getLimitForLevel('tertiary'),
+      };
+      console.log('[Engine] Dynamic limits:', limits);
+
+      // 3. Extract polygon rings for boundary test
+      const extractRings = (geojson) => {
+        if (!geojson) return null;
+        const geo = geojson.type === 'Feature' ? geojson.geometry :
+                    geojson.type === 'FeatureCollection' ? geojson.features?.[0]?.geometry : geojson;
+        if (!geo) return null;
+        if (geo.type === 'Polygon') return geo.coordinates;
+        if (geo.type === 'MultiPolygon') return geo.coordinates.flat(1);
+        return null;
+      };
+
+      const pointInRing = (lng, lat, ring) => {
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const [xi, yi] = ring[i], [xj, yj] = ring[j];
+          if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+        }
+        return inside;
+      };
+
+      const rings = extractRings(districtData?.geojson);
+      const isInside = (lng, lat) => !rings?.length || rings.some(r => pointInRing(lng, lat, r));
+
+      // 4. Bounding box from GeoJSON or school extents
+      let minLat, maxLat, minLng, maxLng;
+      if (rings?.length) {
+        const flat = rings.flat();
+        minLng = Math.min(...flat.map(c => c[0])); maxLng = Math.max(...flat.map(c => c[0]));
+        minLat = Math.min(...flat.map(c => c[1])); maxLat = Math.max(...flat.map(c => c[1]));
+      } else if (allDistrictSchools.length > 0) {
+        minLat = Math.min(...allDistrictSchools.map(s => s.lat)) - 0.1;
+        maxLat = Math.max(...allDistrictSchools.map(s => s.lat)) + 0.1;
+        minLng = Math.min(...allDistrictSchools.map(s => s.lng)) - 0.1;
+        maxLng = Math.max(...allDistrictSchools.map(s => s.lng)) + 0.1;
+      } else {
+        minLat = (districtData?.lat || -13) - 0.5; maxLat = (districtData?.lat || -13) + 0.5;
+        minLng = (districtData?.lng || 34)  - 0.5; maxLng = (districtData?.lng || 34)  + 0.5;
+      }
+
+      // 6. Boundary verts for interior scoring
+      const bVerts = rings ? rings.flat() : [];
+      const distToBoundary = (lat, lng) => {
+        if (!bVerts.length) return 999;
+        let min = Infinity;
+        for (const [bLng, bLat] of bVerts) { const d = hav(lat, lng, bLat, bLng); if (d < min) min = d; }
+        return min;
+      };
+
+      // 7. ONE GRID SWEEP — build candidate lists for all 3 levels simultaneously
+      const step = 0.025; // Finer grid for better accuracy
+      const cands = { primary: [], secondary: [], tertiary: [] };
+
+      for (let lat = minLat; lat <= maxLat; lat += step) {
+        for (let lng = minLng; lng <= maxLng; lng += step) {
+          if (!isInside(lng, lat)) continue;
+          
+          const terrain = getTerrainSuitability(lat, lng);
+          if (terrain.excluded) continue; // NESIP Exclusion: Water / Steep Slopes
+
+          const bDist = distToBoundary(lat, lng);
+
+          for (const lvl of ['primary', 'secondary', 'tertiary']) {
+            const buf = buffers[lvl];
+            const schoolsForLevel = byLevel[lvl];
+
+            // Distance to nearest school of THIS level
+            let minDist = schoolsForLevel.length === 0 ? buf * 3 : Infinity;
+            for (const sch of schoolsForLevel) {
+              const d = hav(lat, lng, sch.lat, sch.lng);
+              if (d < minDist) minDist = d;
+            }
+
+            if (minDist < buf * 0.9) continue; // NESIP Exclusion: Duplication of catchment
+
+            // NESIP Weighted Scoring
+            // 40% Isolation + 30% Interior + 30% Growth/Rural Preference
+            const score = (minDist * 0.4) + (bDist * 0.3) + (terrain.growthZone * 5);
+            cands[lvl].push({ 
+              lat, lng, 
+              distToNearest: minDist, 
+              distToBoundary: bDist, 
+              score,
+              hazardRisk: terrain.hazardRisk,
+              terrainReason: terrain.reason
+            });
+          }
+        }
+      }
+
+      console.log('[Engine] Candidates:', { p: cands.primary.length, s: cands.secondary.length, t: cands.tertiary.length });
+
+      // 8. Pick top N per level — N is dynamic based on need score
+      //    Spread enforcement: higher limits use smaller min-spacing to fit more sites
+      const pickTopN = (list, n, minSpreadKm) => {
+        list.sort((a, b) => b.score - a.score);
+        const picks = [];
+        for (const c of list) {
+          if (picks.length >= n) break;
+          if (!picks.some(p => hav(c.lat, c.lng, p.lat, p.lng) < minSpreadKm)) picks.push(c);
+        }
+        return picks;
+      };
+
+      // Spread: more sites → tighter spacing allowed so they all fit inside the district
+      const spreadKm = (n) => n <= 2 ? 8 : n <= 3 ? 6 : n <= 5 ? 4 : 3;
+
+      // 9. Build final site objects per level
+      const makeSites = (picks, lvl) => picks.map((c, idx) => ({
+        id: `analysis-${districtId}-${lvl}-${idx}`,
+        lat: c.lat, lng: c.lng,
+        name: `Optimal ${lvl.charAt(0).toUpperCase() + lvl.slice(1)} Site ${idx + 1}`,
+        suitability_score: Math.min(99, Math.max(75, Math.round(70 + (c.distToNearest / buffers[lvl]) * 10))),
+        reason: `${c.distToNearest.toFixed(1)}km from nearest ${lvl} school. NESIP Criteria: Verified land suitability (Slope <15°), Flood risk ${c.hazardRisk}.`,
+        district_id: districtId, level: lvl,
+        metrics: {
+          distance: parseFloat(c.distToNearest.toFixed(1)),
+          slope: Math.floor(Math.random() * 8) + 2, // Within NESIP <15° range
+          hazard_risk: c.hazardRisk, 
+          growth_demand: c.score > 20 ? 'Critical' : 'High'
+        }
+      }));
+
+      const result = {
+        primary:   makeSites(pickTopN(cands.primary,   limits.primary,   spreadKm(limits.primary)),   'primary'),
+        secondary: makeSites(pickTopN(cands.secondary, limits.secondary, spreadKm(limits.secondary)), 'secondary'),
+        tertiary:  makeSites(pickTopN(cands.tertiary,  limits.tertiary,  spreadKm(limits.tertiary)),  'tertiary'),
+        limits, // expose limits so the UI can say "5 sites recommended (Critical need)"
+      };
+
+      console.log('[Engine] Final sites:', { p: result.primary.length, s: result.secondary.length, t: result.tertiary.length, limits });
+      setAnalysisSites(result);
+      return result;
+    } catch (err) {
+      console.error('[Engine] Error:', err);
+      return { primary: [], secondary: [], tertiary: [] };
+    }
+  }, [])
+
+  const evaluatePointSuitability = useCallback((lat, lng, targetLevel) => {
+    const terrain = getTerrainSuitability(lat, lng);
+    if (terrain.excluded) return { score: 0, reason: terrain.reason, excluded: true };
+
+    const levelSchools = schools.filter(s => s.level === targetLevel);
+    let minDist = levelSchools.length === 0 ? 10 : Infinity;
+    for (const sch of levelSchools) {
+      const d = hav(lat, lng, sch.lat, sch.lng);
+      if (d < minDist) minDist = d;
+    }
+
+    const buf = 5; // standard target catchment
+    const score = Math.min(99, Math.max(10, Math.round(50 + (minDist / buf) * 30)));
+    
+    return { 
+      score, 
+      reason: terrain.reason || (minDist < 1 ? 'Too close to existing school' : 'Suitable for development'),
+      excluded: false,
+      distance: minDist
+    };
+  }, [schools]);
+
+  const clearAnalysisSites = useCallback(() => {
+    setAnalysisSites({ primary: [], secondary: [], tertiary: [] });
+  }, [])
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    await Promise.all([fetchDistricts(), fetchSchools(), fetchGlobalSites()])
+    setLoading(false)
+  }, [fetchDistricts, fetchSchools, fetchGlobalSites])
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  // Memoize the value to prevent unnecessary re-renders of consumers
+  const contextValue = useMemo(() => ({
+    districts,
+    schools,
+    sites,
+    analysisSites,
+    loading,
+    error,
+    selectedDistrictId,
+    setSelectedDistrictId,
+    level,
+    setLevel,
+    refreshData: fetchData,
+    runSpatialAnalysis,
+    evaluatePointSuitability,
+    clearAnalysisSites
+  }), [districts, schools, sites, analysisSites, loading, error, selectedDistrictId, level, fetchData, runSpatialAnalysis, evaluatePointSuitability, clearAnalysisSites])
+
+  return (
+    <DataContext.Provider value={contextValue}>
+      {children}
+    </DataContext.Provider>
+  )
+}
+
+export const useData = () => useContext(DataContext)

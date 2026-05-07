@@ -3,13 +3,18 @@ import { useDistricts } from '../hooks/useDistricts'
 import { useSchools } from '../hooks/useSchools'
 
 export default function SchoolsPage() {
-  const { districts } = useDistricts()
-  const [selectedDistrictId, setSelectedDistrictId] = useState('')
-  const { schools, loading } = useSchools(selectedDistrictId || null)
+  const { 
+    schools, 
+    loading, 
+    districts,
+    selectedDistrictId,
+    setSelectedDistrictId 
+  } = useSchools()
+  
   const [search, setSearch] = useState('')
 
-  const filteredSchools = schools.filter(s => 
-    s.name.toLowerCase().includes(search.toLowerCase())
+  const filteredSchools = (schools || []).filter(s => 
+    s && s.name && s.name.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -66,7 +71,9 @@ export default function SchoolsPage() {
                     <td className="px-6 py-4 font-medium text-slate-900">{s.name}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        s.level === 'primary' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                        s.level === 'primary' ? 'bg-blue-100 text-blue-700' : 
+                        s.level === 'secondary' ? 'bg-green-100 text-green-700' : 
+                        'bg-purple-100 text-purple-700'
                       }`}>
                         {s.level}
                       </span>

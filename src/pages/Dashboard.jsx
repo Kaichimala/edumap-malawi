@@ -15,24 +15,25 @@ export default function Dashboard() {
   const { districts, loading: dLoading } = useDistricts()
   
   // Aggregate data for stats
-  const totalSchools = districts.reduce((acc, d) => acc + d.p_schools + d.s_schools, 0)
+  const totalSchools = districts.reduce((acc, d) => 
+    acc + (Number(d.p_schools) || 0) + (Number(d.s_schools) || 0) + (Number(d.t_institutions) || 0), 0)
   const totalDistricts = districts.length
-  const criticalDistricts = districts.filter(d => calcScore(d.p_age_pop, d.p_schools, 'primary') >= 80)
+  const criticalDistricts = districts.filter(d => calcScore(Number(d.p_age_pop) || 0, Number(d.p_schools) || 0, 'primary') >= 80)
   
   // Data for Bar Chart: Top 10 Need Scores
   const chartData = districts
     .map(d => ({
       name: d.name,
-      score: calcScore(d.p_age_pop, d.p_schools, 'primary')
+      score: calcScore(Number(d.p_age_pop) || 0, Number(d.p_schools) || 0, 'primary')
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
 
   // Data for Pie Chart: Level Distribution
   const pieData = [
-    { name: 'Primary', value: districts.reduce((acc, d) => acc + d.p_schools, 0) },
-    { name: 'Secondary', value: districts.reduce((acc, d) => acc + d.s_schools, 0) },
-    { name: 'Tertiary', value: districts.reduce((acc, d) => acc + d.t_institutions, 0) },
+    { name: 'Primary', value: districts.reduce((acc, d) => acc + (Number(d.p_schools) || 0), 0) },
+    { name: 'Secondary', value: districts.reduce((acc, d) => acc + (Number(d.s_schools) || 0), 0) },
+    { name: 'Tertiary', value: districts.reduce((acc, d) => acc + (Number(d.t_institutions) || 0), 0) },
   ]
 
   if (dLoading) return <div className="p-8 text-center animate-pulse text-slate-500">Loading Dashboard Data...</div>
@@ -41,17 +42,17 @@ export default function Dashboard() {
     <div className="space-y-8 pb-12">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Schools" value={totalSchools.toLocaleString()} subValue="P: 2.1k | S: 840 | T: 24" icon="🏫" />
-        <StatCard title="Total Districts" value={totalDistricts} subValue={`${criticalDistricts.length} Critical Need`} icon="🇲🇼" />
-        <StatCard title="Population Coverage" value="68.4%" subValue="+2.1% from last year" icon="👥" color="text-green-600" />
-        <StatCard title="Recommended Sites" value="142" subValue="48 Priority-1 Sites" icon="📍" />
+        <StatCard title="Total Schools" value={totalSchools.toLocaleString()} subValue="Facility Inventory" icon="🏫" />
+        <StatCard title="Total Districts" value={totalDistricts} subValue="Administrative Units" icon="🇲🇼" />
+        <StatCard title="Population Coverage" value="68.4%" subValue="Service Area Mapping" icon="👥" color="text-green-600" />
+        <StatCard title="Recommended Sites" value="142" subValue="Planning Pointers" icon="📍" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Bar Chart Section */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-slate-800">Need Score by District (Top 10)</h3>
+            <h3 className="font-bold text-slate-800">School Distribution by District (Top 10)</h3>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Primary Level</span>
           </div>
           <div className="h-80">
@@ -109,7 +110,7 @@ export default function Dashboard() {
               <div key={d.id} className="flex items-center justify-between p-4 bg-red-50/50 rounded-xl border border-red-100">
                 <div>
                   <h4 className="font-bold text-slate-800">{d.name}</h4>
-                  <p className="text-xs text-slate-500">Need Score: <span className="text-red-600 font-bold">{calcScore(d.p_age_pop, d.p_schools, 'primary').toFixed(1)}</span></p>
+                  <p className="text-xs text-slate-500">Planning Status: <span className="text-blue-600 font-bold">Active</span></p>
                 </div>
                 <button 
                   onClick={() => navigate('/map')}
