@@ -28,6 +28,10 @@ export function DataProvider({ children }) {
         .from('v_district_boundaries')
         .select('name, geojson')
 
+      const { data: popData } = await supabase
+        .from('fact_population_stats')
+        .select('district_name, total_total')
+
       if (sbError) throw sbError
 
       const boundsMap = {};
@@ -37,12 +41,20 @@ export function DataProvider({ children }) {
         });
       }
 
+      const popMap = {};
+      if (popData) {
+        popData.forEach(p => {
+          if (p.district_name && p.total_total) popMap[p.district_name.toLowerCase()] = p.total_total;
+        });
+      }
+
       const safeDistricts = (data || [])
         .map(d => ({
           ...d,
           lat: Number(d.lat),
           lng: Number(d.lng),
-          geojson: boundsMap[d.name?.toLowerCase()] || null
+          geojson: boundsMap[d.name?.toLowerCase()] || null,
+          total_population: popMap[d.name?.toLowerCase()] || 0
         }))
         .filter(d => !isNaN(d.lat) && !isNaN(d.lng) && d.lat !== 0 && d.lng !== 0)
 
@@ -56,61 +68,18 @@ export function DataProvider({ children }) {
   const fetchSchools = useCallback(async () => {
     try {
       const { data, error: sbError } = await supabase
-        .from('mwi_education_edumap')
-        .select('id, name, geometry, district_id, amenity')
+        .from('app_schools')
+        .select('id, name, lat, lng, district_id, level, students')
       
       if (sbError) throw sbError
       
-      const seenNames = new Set();
-      const processed = (data || []).map(s => {
-        let lat = 0, lng = 0;
-        if (s.geometry?.coordinates) {
-          lng = s.geometry.coordinates[0];
-          lat = s.geometry.coordinates[1];
-        }
-        if (!lat || !lng) return null;
-
-        const name = s.name || 'Unknown School';
-        const noiseKeywords = ['BUILDING', 'HALL', 'OFFICE', 'STAFF', 'GATE', 'CLINIC', 'HOSTEL', 'HOUSE', 'MESS'];
-        if (noiseKeywords.some(k => name.toUpperCase().includes(k))) return null;
-
-        let level = 'primary';
-        let students = 400;
-        let displayName = name;
-        const upperName = name.toUpperCase();
-
-        if (s.amenity === 'university' || s.amenity === 'college' || ['UNIVERSITY', 'COLLEGE', 'FACULTY', 'POLYTECHNIC', 'INSTITUTE', 'TRAINING CENTRE'].some(k => upperName.includes(k))) {
-          level = 'tertiary';
-          students = 8000;
-          
-          // Fix: If it says University of Malawi but is in Blantyre (lng < 35.1), it's actually KUHeS
-          const isKuhes = upperName.includes('COLLEGE OF MEDICINE') || 
-                          upperName.includes('KUHES') || 
-                          (upperName.includes('NURSING') && !upperName.includes('ZOMBA')) ||
-                          (upperName.includes('UNIVERSITY OF MALAWI') && lng < 35.1);
-
-          if (isKuhes) {
-            displayName = 'Kamuzu University of Health Sciences (KUHeS)';
-          } else if (upperName.includes('CHANCELLOR') || upperName.includes('UNIVERSITY OF MALAWI') || upperName.includes('UNIMA') || upperName.includes('FACULTY') || upperName.includes('CENTRE')) {
-            displayName = 'University of Malawi (UNIMA)';
-          } else if (upperName.includes('POLYTECHNIC') || upperName.includes('MUBAS') || upperName.includes('BUSINESS AND APPLIED')) {
-            displayName = 'Malawi University of Business and Applied Sciences (MUBAS)';
-          } else if (upperName.includes('MZUZU UNIVERSITY') || upperName.includes('MZUNI')) {
-            displayName = 'Mzuzu University (MZUNI)';
-          } else if (upperName.includes('LUANAR') || upperName.includes('BUNDUNDA') || upperName.includes('NATURAL RESOURCES')) {
-            displayName = 'LUANAR';
-          }
-        } else if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
-          level = 'secondary';
-          students = 280;
-        }
-
-        const uniqueKey = `${displayName}-${level}`;
-        if (seenNames.has(uniqueKey)) return null;
-        seenNames.add(uniqueKey);
-
-        return { ...s, name: displayName, lat, lng, level, students };
-      }).filter(Boolean);
+      const processed = (data || [])
+        .map(s => ({
+          ...s,
+          lat: Number(s.lat),
+          lng: Number(s.lng)
+        }))
+        .filter(s => !isNaN(s.lat) && !isNaN(s.lng) && s.lat !== 0 && s.lng !== 0)
 
       setSchools(processed)
     } catch (err) {

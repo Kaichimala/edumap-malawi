@@ -24,6 +24,7 @@ export default function Dashboard() {
   const totalSchools = districts.reduce((acc, d) => 
     acc + (Number(d.p_schools) || 0) + (Number(d.s_schools) || 0) + (Number(d.t_institutions) || 0), 0)
   const totalDistricts = districts.length
+  const totalPopulation = districts.reduce((acc, d) => acc + (Number(d.total_population) || 0), 0)
   const criticalDistricts = districts.filter(d => calcScore(Number(d.p_age_pop) || 0, Number(d.p_schools) || 0, 'primary') >= 80)
 
   const chartData = districts
@@ -68,9 +69,9 @@ export default function Dashboard() {
           iconBg="bg-indigo-50"
         />
         <StatCard
-          title="Population Coverage"
-          value="68.4%"
-          subValue="+2.1% from last year"
+          title="Total Population"
+          value={totalPopulation.toLocaleString()}
+          subValue="National Census Data"
           icon={HiOutlineUsers}
           iconColor="text-emerald-600"
           iconBg="bg-emerald-50"

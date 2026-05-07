@@ -546,6 +546,12 @@ export default function MapView({
                       {(level === 'primary' ? d.p_age_pop : level === 'secondary' ? d.s_age_pop : d.t_age_pop)?.toLocaleString() || 'N/A'}
                     </span>
                   </div>
+                  <div className="flex justify-between gap-4 text-xs">
+                    <span className="text-slate-500">Total Pop:</span>
+                    <span className="font-bold text-slate-700">
+                      {d.total_population?.toLocaleString() || 'N/A'}
+                    </span>
+                  </div>
                   <div className="mt-1 pt-1 border-t border-slate-100 flex justify-between items-center">
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Need Score</span>
                     <span className="text-[10px] font-black text-red-500">
