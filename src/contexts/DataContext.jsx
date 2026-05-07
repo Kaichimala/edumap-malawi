@@ -362,7 +362,7 @@ export function DataProvider({ children }) {
         district_id: districtId, level: lvl,
         metrics: {
           distance: parseFloat(c.distToNearest.toFixed(1)),
-          slope: Math.floor(Math.random() * 8) + 2, // Within NESIP <15° range
+          slope: 5, // Conservative NESIP-compliant estimate (<15°); real DEM integration is a future enhancement
           hazard_risk: c.hazardRisk, 
           growth_demand: c.score > 20 ? 'Critical' : 'High'
         }
