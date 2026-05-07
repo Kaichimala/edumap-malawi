@@ -68,18 +68,68 @@ export function DataProvider({ children }) {
   const fetchSchools = useCallback(async () => {
     try {
       const { data, error: sbError } = await supabase
-        .from('app_schools')
-        .select('id, name, lat, lng, district_id, level, students')
+        .from('api_schools_for_app')
+        .select('education_id, education_name, lat, lng, district_id, amenity, level, students')
       
       if (sbError) throw sbError
       
-      const processed = (data || [])
-        .map(s => ({
-          ...s,
-          lat: Number(s.lat),
-          lng: Number(s.lng)
-        }))
-        .filter(s => !isNaN(s.lat) && !isNaN(s.lng) && s.lat !== 0 && s.lng !== 0)
+      const seenNames = new Set();
+      const processed = (data || []).map(s => {
+        let lat = Number(s.lat);
+        let lng = Number(s.lng);
+        
+        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
+
+        const name = s.education_name || 'Unknown School';
+        const noiseKeywords = ['BUILDING', 'HALL', 'OFFICE', 'STAFF', 'GATE', 'CLINIC', 'HOSTEL', 'HOUSE', 'MESS'];
+        if (noiseKeywords.some(k => name.toUpperCase().includes(k))) return null;
+
+        let level = s.level;
+        if (!level || level === 'school') level = 'primary';
+        
+        let students = s.students || (level === 'primary' ? 400 : level === 'secondary' ? 280 : 8000);
+        let displayName = name;
+        const upperName = name.toUpperCase();
+
+        if (s.amenity === 'university' || s.amenity === 'college' || ['UNIVERSITY', 'COLLEGE', 'FACULTY', 'POLYTECHNIC', 'INSTITUTE', 'TRAINING CENTRE'].some(k => upperName.includes(k))) {
+          level = 'tertiary';
+          students = 8000;
+          
+          const isKuhes = upperName.includes('COLLEGE OF MEDICINE') || 
+                          upperName.includes('KUHES') || 
+                          (upperName.includes('NURSING') && !upperName.includes('ZOMBA')) ||
+                          (upperName.includes('UNIVERSITY OF MALAWI') && lng < 35.1);
+
+          if (isKuhes) {
+            displayName = 'Kamuzu University of Health Sciences (KUHeS)';
+          } else if (upperName.includes('CHANCELLOR') || upperName.includes('UNIVERSITY OF MALAWI') || upperName.includes('UNIMA') || upperName.includes('FACULTY') || upperName.includes('CENTRE')) {
+            displayName = 'University of Malawi (UNIMA)';
+          } else if (upperName.includes('POLYTECHNIC') || upperName.includes('MUBAS') || upperName.includes('BUSINESS AND APPLIED')) {
+            displayName = 'Malawi University of Business and Applied Sciences (MUBAS)';
+          } else if (upperName.includes('MZUZU UNIVERSITY') || upperName.includes('MZUNI')) {
+            displayName = 'Mzuzu University (MZUNI)';
+          } else if (upperName.includes('LUANAR') || upperName.includes('BUNDUNDA') || upperName.includes('NATURAL RESOURCES')) {
+            displayName = 'LUANAR';
+          }
+        } else if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
+          level = 'secondary';
+          students = 280;
+        }
+
+        const uniqueKey = `${displayName}-${level}`;
+        if (seenNames.has(uniqueKey)) return null;
+        seenNames.add(uniqueKey);
+
+        return { 
+          id: s.education_id, 
+          name: displayName, 
+          lat, 
+          lng, 
+          district_id: s.district_id, 
+          level, 
+          students 
+        };
+      }).filter(Boolean);
 
       setSchools(processed)
     } catch (err) {
