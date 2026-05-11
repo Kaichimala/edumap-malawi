@@ -222,12 +222,172 @@ export default function MapView({
         const link = document.createElement('a')
         link.download = `${filename}.png`; link.href = canvas.toDataURL('image/png'); link.click()
       } else if (format === 'pdf') {
-        const imgData = canvas.toDataURL('image/png')
-        const pdf = new jsPDF({
-          orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
-          unit: 'px', format: [canvas.width, canvas.height]
-        })
-        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height)
+        const sites = analysisSites?.[level] || []
+        const dist  = selectedDistrict
+        const dateStr    = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+        const levelLabel = level.charAt(0).toUpperCase() + level.slice(1)
+        const instWord   = level === 'tertiary' ? 'institutions' : 'schools'
+
+        // A4 portrait in points
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+        const W  = 595.28
+        const H  = 841.89
+        const M  = 40          // margin
+        const CW = W - M * 2  // content width = 515.28
+
+        // ── Branded header ────────────────────────────────────────
+        pdf.setFillColor(26, 82, 118)
+        pdf.rect(0, 0, W, 8, 'F')
+        pdf.setFillColor(248, 250, 252)
+        pdf.rect(0, 8, W, 68, 'F')
+
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(16)
+        pdf.setTextColor(26, 82, 118)
+        pdf.text('EduMap Malawi', M, 34)
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(9)
+        pdf.setTextColor(100, 116, 139)
+        pdf.text('Ministry of Education — GIS Infrastructure Planning System', M, 48)
+
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(13)
+        pdf.setTextColor(15, 23, 42)
+        pdf.text(dist?.name ? `${dist.name} District` : 'National Analysis', W - M, 32, { align: 'right' })
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 116, 139)
+        pdf.text(`${levelLabel} Level · ${dateStr}`, W - M, 46, { align: 'right' })
+        pdf.text('NESIP Spatial Suitability Analysis', W - M, 58, { align: 'right' })
+
+        pdf.setDrawColor(226, 232, 240)
+        pdf.setLineWidth(0.5)
+        pdf.line(M, 76, W - M, 76)
+
+        // ── Map screenshot ────────────────────────────────────────
+        const imgData  = canvas.toDataURL('image/png')
+        const mapImgH  = 255
+        pdf.addImage(imgData, 'PNG', M, 84, CW, mapImgH, undefined, 'FAST')
+
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'italic')
+        pdf.setTextColor(148, 163, 184)
+        pdf.text(
+          `Fig. 1 — Recommended ${levelLabel} sites for ${dist?.name || ''} District. Red pins = prioritised locations.`,
+          M, 84 + mapImgH + 12
+        )
+
+        let y = 84 + mapImgH + 30
+
+        // ── Recommended sites table ───────────────────────────────
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(11)
+        pdf.setTextColor(15, 23, 42)
+        pdf.text('Recommended Construction Sites', M, y)
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 116, 139)
+        pdf.text(
+          sites.length > 0
+            ? `${sites.length} site${sites.length !== 1 ? 's' : ''} identified via NESIP spatial suitability criteria`
+            : 'No sites available — run spatial analysis on the map first.',
+          M, y + 13
+        )
+        y += 28
+
+        if (sites.length > 0) {
+          const cols = [
+            { label: 'Site Name',        w: 125 },
+            { label: 'Latitude',         w: 65  },
+            { label: 'Longitude',        w: 65  },
+            { label: 'Dist. to Nearest', w: 90  },
+            { label: 'Flood Risk',       w: 75  },
+            { label: 'Score',            w: 50  },
+          ]
+
+          // Header row
+          pdf.setFillColor(26, 82, 118)
+          pdf.rect(M, y, CW, 20, 'F')
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(8)
+          pdf.setTextColor(255, 255, 255)
+          let x = M + 6
+          cols.forEach(col => { pdf.text(col.label, x, y + 13); x += col.w })
+          y += 20
+
+          // Data rows
+          sites.forEach((site, i) => {
+            const even = i % 2 === 0
+            pdf.setFillColor(even ? 248 : 255, even ? 250 : 255, even ? 252 : 255)
+            pdf.rect(M, y, CW, 18, 'F')
+
+            const isHighRisk = (site.metrics?.hazard_risk || 'Low') === 'High'
+            const rowData = [
+              { text: site.name,                              bold: false, color: [30,  41,  59]  },
+              { text: site.lat.toFixed(4),                   bold: false, color: [71,  85, 105]  },
+              { text: site.lng.toFixed(4),                   bold: false, color: [71,  85, 105]  },
+              { text: `${site.metrics?.distance ?? 'N/A'} km`, bold: false, color: [71,  85, 105]  },
+              { text: site.metrics?.hazard_risk || 'Low',    bold: true,  color: isHighRisk ? [220, 38, 38] : [22, 163, 74] },
+              { text: String(site.suitability_score ?? 85),  bold: true,  color: [26,  82, 118]  },
+            ]
+
+            x = M + 6
+            rowData.forEach((cell, j) => {
+              pdf.setFont('helvetica', cell.bold ? 'bold' : 'normal')
+              pdf.setFontSize(8)
+              pdf.setTextColor(cell.color[0], cell.color[1], cell.color[2])
+              pdf.text(cell.text, x, y + 12)
+              x += cols[j].w
+            })
+
+            pdf.setDrawColor(226, 232, 240)
+            pdf.setLineWidth(0.3)
+            pdf.line(M, y + 18, M + CW, y + 18)
+            y += 18
+          })
+          y += 14
+        }
+
+        // ── District summary box ──────────────────────────────────
+        pdf.setFillColor(239, 246, 255)
+        pdf.roundedRect(M, y, CW, 46, 4, 4, 'F')
+        pdf.setDrawColor(191, 219, 254)
+        pdf.setLineWidth(0.5)
+        pdf.roundedRect(M, y, CW, 46, 4, 4, 'S')
+
+        const agePop = level === 'primary' ? dist?.p_age_pop
+                     : level === 'secondary' ? dist?.s_age_pop
+                     : dist?.t_age_pop
+
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(9)
+        pdf.setTextColor(26, 82, 118)
+        pdf.text('District Planning Summary', M + 12, y + 15)
+
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor(71, 85, 105)
+        pdf.text(
+          `${levelLabel} age-group population: ${agePop?.toLocaleString() ?? 'N/A'}   ·   Recommended new ${instWord}: ${sites.length}`,
+          M + 12, y + 29
+        )
+        pdf.text(
+          'Analysis based on MoE student-to-school ratio guidelines and NESIP land suitability criteria.',
+          M + 12, y + 41
+        )
+
+        // ── Page footer ───────────────────────────────────────────
+        pdf.setFillColor(26, 82, 118)
+        pdf.rect(0, H - 22, W, 22, 'F')
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(7.5)
+        pdf.setTextColor(255, 255, 255)
+        pdf.text('EduMap Malawi MIS — Confidential Planning Document', M, H - 8)
+        pdf.text('Data sourced from MoE Spatial Database · OpenStreetMap contributors', W - M, H - 8, { align: 'right' })
+
         pdf.save(`${filename}.pdf`)
       }
     } catch (err) {
