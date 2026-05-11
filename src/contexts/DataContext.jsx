@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { calcScore, getRecommendedNew } from '../utils/scoring'
 
@@ -13,9 +13,52 @@ export function DataProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
+  const districtsRef = useRef([])
+
   // Navigation Memory
   const [selectedDistrictId, setSelectedDistrictId] = useState(null)
   const [level, setLevel] = useState('primary')
+
+  const utmToLatLng = (easting, northing, zone = 36, southernHemisphere = true) => {
+    const a = 6378137.0
+    const eccSquared = 0.00669437999014
+    const k0 = 0.9996
+    const eccPrimeSquared = eccSquared / (1 - eccSquared)
+    const e1 = (1 - Math.sqrt(1 - eccSquared)) / (1 + Math.sqrt(1 - eccSquared))
+    const x = easting - 500000.0
+    let y = northing
+    if (southernHemisphere) y -= 10000000.0
+
+    const longOrigin = (zone - 1) * 6 - 180 + 3
+    const M = y / k0
+    const mu = M / (a * (1 - eccSquared / 4 - (3 * eccSquared * eccSquared) / 64 - (5 * eccSquared ** 3) / 256))
+    const phi1Rad = mu +
+      (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu) +
+      (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu) +
+      (151 * e1 ** 3 / 96) * Math.sin(6 * mu) +
+      (1097 * e1 ** 4 / 512) * Math.sin(8 * mu)
+
+    const N1 = a / Math.sqrt(1 - eccSquared * Math.sin(phi1Rad) ** 2)
+    const T1 = Math.tan(phi1Rad) ** 2
+    const C1 = eccPrimeSquared * Math.cos(phi1Rad) ** 2
+    const R1 = a * (1 - eccSquared) / Math.pow(1 - eccSquared * Math.sin(phi1Rad) ** 2, 1.5)
+    const D = x / (N1 * k0)
+
+    let lat = phi1Rad - (N1 * Math.tan(phi1Rad) / R1) * (
+      D ** 2 / 2 -
+      (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * eccPrimeSquared) * D ** 4 / 24 +
+      (61 + 90 * T1 + 298 * C1 + 45 * T1 ** 2 - 252 * eccPrimeSquared - 3 * C1 * C1) * D ** 6 / 720
+    )
+    lat = lat * 180 / Math.PI
+
+    let lon = (D -
+      (1 + 2 * T1 + C1) * D ** 3 / 6 +
+      (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * eccPrimeSquared + 24 * T1 ** 2) * D ** 5 / 120
+    ) / Math.cos(phi1Rad)
+    lon = longOrigin + lon * 180 / Math.PI
+
+    return [lat, lon]
+  }
 
   const fetchDistricts = useCallback(async () => {
     try {
@@ -58,6 +101,7 @@ export function DataProvider({ children }) {
         }))
         .filter(d => !isNaN(d.lat) && !isNaN(d.lng) && d.lat !== 0 && d.lng !== 0)
 
+      districtsRef.current = safeDistricts
       setDistricts(safeDistricts)
     } catch (err) {
       console.error("Error fetching districts:", err)
@@ -68,72 +112,125 @@ export function DataProvider({ children }) {
   const fetchSchools = useCallback(async () => {
     try {
       const { data, error: sbError } = await supabase
-        .from('api_schools_for_app')
-        .select('education_id, education_name, lat, lng, district_id, amenity, level, students')
-      
-      if (sbError) throw sbError
-      
+        .from('mwi_schools_shp')
+        .select('school_id, school_name, status, district, xcoord, ycoord')
+
+      if (sbError) {
+        throw sbError
+      }
+
+      const districtMap = districtsRef.current.reduce((acc, d) => {
+        if (d.name) acc[d.name.toLowerCase()] = d.id
+        return acc
+      }, {})
+
       const seenNames = new Set();
       const processed = (data || []).map(s => {
-        let lat = Number(s.lat);
-        let lng = Number(s.lng);
-        
-        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
+        const x = Number(s.xcoord)
+        const y = Number(s.ycoord)
+        if (isNaN(x) || isNaN(y) || x === 0 || y === 0) return null
 
-        const name = s.education_name || 'Unknown School';
-        const noiseKeywords = ['BUILDING', 'HALL', 'OFFICE', 'STAFF', 'GATE', 'CLINIC', 'HOSTEL', 'HOUSE', 'MESS'];
-        if (noiseKeywords.some(k => name.toUpperCase().includes(k))) return null;
+        const [lat, lng] = utmToLatLng(x, y, 36, true)
+        if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
 
-        let level = s.level;
-        if (!level || level === 'school') level = 'primary';
-        
-        let students = s.students || (level === 'primary' ? 400 : level === 'secondary' ? 280 : 8000);
-        let displayName = name;
-        const upperName = name.toUpperCase();
+        const name = s.school_name || 'Unknown School'
+        const upperName = name.toUpperCase()
 
-        if (s.amenity === 'university' || s.amenity === 'college' || ['UNIVERSITY', 'COLLEGE', 'FACULTY', 'POLYTECHNIC', 'INSTITUTE', 'TRAINING CENTRE'].some(k => upperName.includes(k))) {
-          level = 'tertiary';
-          students = 8000;
-          
-          const isKuhes = upperName.includes('COLLEGE OF MEDICINE') || 
-                          upperName.includes('KUHES') || 
-                          (upperName.includes('NURSING') && !upperName.includes('ZOMBA')) ||
-                          (upperName.includes('UNIVERSITY OF MALAWI') && lng < 35.1);
-
-          if (isKuhes) {
-            displayName = 'Kamuzu University of Health Sciences (KUHeS)';
-          } else if (upperName.includes('CHANCELLOR') || upperName.includes('UNIVERSITY OF MALAWI') || upperName.includes('UNIMA') || upperName.includes('FACULTY') || upperName.includes('CENTRE')) {
-            displayName = 'University of Malawi (UNIMA)';
-          } else if (upperName.includes('POLYTECHNIC') || upperName.includes('MUBAS') || upperName.includes('BUSINESS AND APPLIED')) {
-            displayName = 'Malawi University of Business and Applied Sciences (MUBAS)';
-          } else if (upperName.includes('MZUZU UNIVERSITY') || upperName.includes('MZUNI')) {
-            displayName = 'Mzuzu University (MZUNI)';
-          } else if (upperName.includes('LUANAR') || upperName.includes('BUNDUNDA') || upperName.includes('NATURAL RESOURCES')) {
-            displayName = 'LUANAR';
-          }
-        } else if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
-          level = 'secondary';
-          students = 280;
+        let level = 'primary'
+        if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
+          level = 'secondary'
+        } else if (s.status?.toUpperCase() === 'TERTIARY' || upperName.includes('UNIVERSITY') || upperName.includes('COLLEGE') || upperName.includes('INSTITUTE')) {
+          level = 'tertiary'
         }
 
-        const uniqueKey = `${displayName}-${level}`;
-        if (seenNames.has(uniqueKey)) return null;
-        seenNames.add(uniqueKey);
+        const uniqueKey = `${name}-${level}`
+        if (seenNames.has(uniqueKey)) return null
+        seenNames.add(uniqueKey)
 
-        return { 
-          id: s.education_id, 
-          name: displayName, 
-          lat, 
-          lng, 
-          district_id: s.district_id, 
-          level, 
-          students 
-        };
-      }).filter(Boolean);
+        return {
+          id: `mwi-${s.school_id}`,
+          name,
+          lat,
+          lng,
+          district_id: districtMap[(s.district || '').toLowerCase()] ?? null,
+          district_name: s.district || null,
+          level,
+          students: level === 'primary' ? 400 : level === 'secondary' ? 280 : 8000
+        }
+      }).filter(Boolean)
 
       setSchools(processed)
     } catch (err) {
-      console.error("Error fetching schools:", err)
+      console.error("Error fetching schools from mwi_schools_shp:", err)
+      // fall back to the existing app-level school view if the new table query fails
+      try {
+        const { data, error: fallbackError } = await supabase
+          .from('api_schools_for_app')
+          .select('education_id, education_name, lat, lng, district_id, amenity, level, students')
+
+        if (fallbackError) throw fallbackError
+
+        const seenNames = new Set();
+        const processed = (data || []).map(s => {
+          let lat = Number(s.lat);
+          let lng = Number(s.lng);
+          if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
+
+          const name = s.education_name || 'Unknown School';
+          const noiseKeywords = ['BUILDING', 'HALL', 'OFFICE', 'STAFF', 'GATE', 'CLINIC', 'HOSTEL', 'HOUSE', 'MESS'];
+          if (noiseKeywords.some(k => name.toUpperCase().includes(k))) return null;
+
+          let level = s.level;
+          if (!level || level === 'school') level = 'primary';
+
+          let students = s.students || (level === 'primary' ? 400 : level === 'secondary' ? 280 : 8000);
+          let displayName = name;
+          const upperName = name.toUpperCase();
+
+          if (s.amenity === 'university' || s.amenity === 'college' || ['UNIVERSITY', 'COLLEGE', 'FACULTY', 'POLYTECHNIC', 'INSTITUTE', 'TRAINING CENTRE'].some(k => upperName.includes(k))) {
+            level = 'tertiary';
+            students = 8000;
+
+            const isKuhes = upperName.includes('COLLEGE OF MEDICINE') || 
+                            upperName.includes('KUHES') || 
+                            (upperName.includes('NURSING') && !upperName.includes('ZOMBA')) ||
+                            (upperName.includes('UNIVERSITY OF MALAWI') && lng < 35.1);
+
+            if (isKuhes) {
+              displayName = 'Kamuzu University of Health Sciences (KUHeS)';
+            } else if (upperName.includes('CHANCELLOR') || upperName.includes('UNIVERSITY OF MALAWI') || upperName.includes('UNIMA') || upperName.includes('FACULTY') || upperName.includes('CENTRE')) {
+              displayName = 'University of Malawi (UNIMA)';
+            } else if (upperName.includes('POLYTECHNIC') || upperName.includes('MUBAS') || upperName.includes('BUSINESS AND APPLIED')) {
+              displayName = 'Malawi University of Business and Applied Sciences (MUBAS)';
+            } else if (upperName.includes('MZUZU UNIVERSITY') || upperName.includes('MZUNI')) {
+              displayName = 'Mzuzu University (MZUNI)';
+            } else if (upperName.includes('LUANAR') || upperName.includes('BUNDUNDA') || upperName.includes('NATURAL RESOURCES')) {
+              displayName = 'LUANAR';
+            }
+          } else if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
+            level = 'secondary';
+            students = 280;
+          }
+
+          const uniqueKey = `${displayName}-${level}`
+          if (seenNames.has(uniqueKey)) return null
+          seenNames.add(uniqueKey)
+
+          return {
+            id: s.education_id,
+            name: displayName,
+            lat,
+            lng,
+            district_id: s.district_id,
+            level,
+            students
+          }
+        }).filter(Boolean)
+
+        setSchools(processed)
+      } catch (fallbackErr) {
+        console.error("Fallback error fetching schools:", fallbackErr)
+      }
     }
   }, [])
 
@@ -431,13 +528,14 @@ export function DataProvider({ children }) {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    await Promise.all([fetchDistricts(), fetchSchools(), fetchGlobalSites()])
+    await fetchDistricts()
+    await Promise.all([fetchSchools(), fetchGlobalSites()])
     setLoading(false)
   }, [fetchDistricts, fetchSchools, fetchGlobalSites])
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [fetchData])
 
   // Memoize the value to prevent unnecessary re-renders of consumers
   const contextValue = useMemo(() => ({

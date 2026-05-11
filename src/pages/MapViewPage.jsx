@@ -16,15 +16,21 @@ export default function MapViewPage() {
     setLevel 
   } = useDistricts()
 
-  const { runSpatialAnalysis, clearAnalysisSites, analysisSites } = useData()
+  const { clearAnalysisSites, analysisSites } = useData()
 
   const selectedDistrict = districts.find(d => String(d.id) === String(selectedDistrictId))
-  const handleSelect = (d) => setSelectedDistrictId(d ? d.id : null)
+  const handleSelect = (d) => {
+    if (isAnalyzed) {
+      setIsAnalyzed(false)
+      clearAnalysisSites()
+      analyzedLevelRef.current = null
+    }
+    setSelectedDistrictId(d ? d.id : null)
+  }
   
   const [isAnalyzed, setIsAnalyzed] = useState(() => {
     return sessionStorage.getItem('edumap_is_analyzed_map') === 'true'
   })
-  const [isReanalyzing, setIsReanalyzing] = useState(false)
   const [isBuildMode, setIsBuildMode] = useState(false)
   const [isDestroyMode, setIsDestroyMode] = useState(false)
   const [showSites, setShowSites] = useState(true)
@@ -53,15 +59,6 @@ export default function MapViewPage() {
     // Also reset to the very beginning (pre-district selection)
     setSelectedDistrictId(null)
   }
-
-  // When district changes, clear old analysis
-  useEffect(() => {
-    if (isAnalyzed) {
-      setIsAnalyzed(false)
-      clearAnalysisSites()
-      analyzedLevelRef.current = null
-    }
-  }, [selectedDistrictId])
 
   if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse font-medium tracking-widest">Initialising Spatial Data Engine...</div>
 
@@ -179,26 +176,13 @@ export default function MapViewPage() {
           </div>
         </div>
 
-        {/* Re-analyzing overlay */}
-        {isReanalyzing && (
-          <div className="absolute inset-0 z-[900] bg-slate-900/20 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
-            <div className="bg-white/95 rounded-2xl shadow-2xl px-8 py-5 flex items-center gap-4 border border-slate-100">
-              <div className="w-5 h-5 border-2 border-[#1a5276]/30 border-t-[#1a5276] rounded-full animate-spin" />
-              <div>
-                <p className="font-black text-sm text-slate-800 uppercase tracking-tight">Re-running Analysis</p>
-                <p className="text-[10px] text-slate-500 font-medium capitalize">Scanning for {level} school deserts...</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         <MapView
           districts={districts}
           selectedDistrict={selectedDistrict}
           level={level}
           onSelect={handleSelect}
           showMarkers={true}
-          showSites={showSites && !isReanalyzing}
+          showSites={showSites}
           isBuildMode={isBuildMode}
           setIsBuildMode={setIsBuildMode}
           isDestroyMode={isDestroyMode}

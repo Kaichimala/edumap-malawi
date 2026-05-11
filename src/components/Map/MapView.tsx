@@ -195,11 +195,34 @@ export default function MapView({
   const [formState, setFormState] = useState({ name: '', capacity: 400, level: 'primary' })
   const [destroySearch, setDestroySearch] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showHeatmap, setShowHeatmap] = useState(false)
   
   const mapRef = useRef(null)
   
   const { schools, addSchool, removeSchool, getAllSchools } = useSchools()
   const { analysisSites, evaluatePointSuitability } = useData()
+
+  const districtSchoolCount = (district) => (
+    (Number(district.p_schools) || 0) +
+    (Number(district.s_schools) || 0) +
+    (Number(district.t_institutions) || 0)
+  )
+
+  const maxDistrictSchools = Math.max(...(districts || []).map(d => districtSchoolCount(d)), 1)
+  const heatThresholds = {
+    t1: Math.max(1, Math.ceil(maxDistrictSchools * 0.15)),
+    t2: Math.max(1, Math.ceil(maxDistrictSchools * 0.33)),
+    t3: Math.max(1, Math.ceil(maxDistrictSchools * 0.55)),
+    t4: Math.max(1, Math.ceil(maxDistrictSchools * 0.8))
+  }
+
+  const getDistrictHeatColor = (count) => {
+    if (count <= heatThresholds.t1) return '#dc2626'
+    if (count <= heatThresholds.t2) return '#f97316'
+    if (count <= heatThresholds.t3) return '#facc15'
+    if (count <= heatThresholds.t4) return '#22c55e'
+    return '#2563eb'
+  }
 
   const handleExport = async (format) => {
     if (!mapRef.current) return
@@ -284,6 +307,7 @@ export default function MapView({
           </div>
         </div>
       )}
+
 
       {/* Build Form Modal Overlay */}
       {newSchoolLoc && (
@@ -435,7 +459,54 @@ export default function MapView({
         </div>
       )}
 
-      {/* Export Menu (Consolidated & Collapsible) */}
+      {/* Heatmap Control - Bottom Left */}
+      <div className="absolute bottom-6 left-6 z-[500] flex flex-col items-start gap-2 export-ignore">
+        <button
+          onClick={() => setShowHeatmap(prev => !prev)}
+          className="flex items-center gap-2 bg-[#1a5276] text-white px-6 py-3 rounded-2xl shadow-2xl hover:bg-slate-800 transition-all active:scale-95 relative"
+        >
+          <span className="font-bold text-xs tracking-tight uppercase">{showHeatmap ? 'Hide Heatmap' : 'School Heatmap'}</span>
+        </button>
+
+        {showHeatmap && (
+          <div className="w-80 p-4 bg-white/95 border border-slate-200 rounded-3xl shadow-2xl text-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">District School Coverage</p>
+                <p className="text-sm font-bold text-slate-900">Schools per district</p>
+              </div>
+              <button onClick={() => setShowHeatmap(false)} className="text-slate-400 hover:text-slate-700">
+                <HiX className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid gap-2 mb-3">
+              <div className="flex items-center gap-3 text-[11px] text-slate-700">
+                <span className="inline-block h-3 w-8 rounded-full bg-[#dc2626]" />
+                <span>0 – {heatThresholds.t1} schools</span>
+              </div>
+              <div className="flex items-center gap-3 text-[11px] text-slate-700">
+                <span className="inline-block h-3 w-8 rounded-full bg-[#f97316]" />
+                <span>{heatThresholds.t1 + 1} – {heatThresholds.t2} schools</span>
+              </div>
+              <div className="flex items-center gap-3 text-[11px] text-slate-700">
+                <span className="inline-block h-3 w-8 rounded-full bg-[#facc15]" />
+                <span>{heatThresholds.t2 + 1} – {heatThresholds.t3} schools</span>
+              </div>
+              <div className="flex items-center gap-3 text-[11px] text-slate-700">
+                <span className="inline-block h-3 w-8 rounded-full bg-[#22c55e]" />
+                <span>{heatThresholds.t3 + 1} – {heatThresholds.t4} schools</span>
+              </div>
+              <div className="flex items-center gap-3 text-[11px] text-slate-700">
+                <span className="inline-block h-3 w-8 rounded-full bg-[#2563eb]" />
+                <span>{heatThresholds.t4 + 1}+ schools</span>
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-slate-500">This overlay colors districts by their total school count to help identify underserved areas.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Export Analysis Control - Bottom Right */}
       <div 
         className="absolute bottom-6 right-6 z-[500] flex flex-col items-end gap-2 export-ignore"
         onMouseEnter={() => setShowExportMenu(true)}
@@ -489,17 +560,23 @@ export default function MapView({
         {districts?.map(d => {
           if (!d.geojson) return null;
           const isSelected = selectedDistrict?.id === d.id;
-          
+          const districtCount = districtSchoolCount(d)
+          const fillColor = showHeatmap ? getDistrictHeatColor(districtCount) : isSelected ? '#3b82f6' : 'transparent'
+          const fillOpacity = showHeatmap ? 0.45 : isSelected ? 0.05 : 0
+          const borderColor = showHeatmap ? '#334155' : isSelected ? '#3b82f6' : '#94a3b8'
+          const borderWeight = isSelected ? 3 : 1
+          const borderOpacity = showHeatmap ? 0.55 : isSelected ? 0.8 : 0.0
+
           return (
             <GeoJSON 
               key={`district-hover-${d.id}`}
               data={d.geojson} 
               style={{
-                color: isSelected ? '#3b82f6' : '#94a3b8',
-                weight: isSelected ? 3 : 1,
-                opacity: isSelected ? 0.8 : 0.0, // Invisible until hovered if not selected
-                fillColor: isSelected ? '#3b82f6' : 'transparent',
-                fillOpacity: isSelected ? 0.05 : 0
+                color: borderColor,
+                weight: borderWeight,
+                opacity: borderOpacity,
+                fillColor,
+                fillOpacity
               }}
               eventHandlers={{
                 mouseover: (e) => {
@@ -509,8 +586,8 @@ export default function MapView({
                       color: '#3b82f6',
                       weight: 2,
                       opacity: 0.8,
-                      fillColor: '#3b82f6',
-                      fillOpacity: 0.1
+                      fillColor: showHeatmap ? fillColor : '#3b82f6',
+                      fillOpacity: showHeatmap ? 0.55 : 0.1
                     });
                   }
                 },
@@ -518,11 +595,11 @@ export default function MapView({
                   const layer = e.target;
                   if (!isSelected) {
                     layer.setStyle({
-                      color: '#94a3b8',
-                      weight: 1,
-                      opacity: 0.0,
-                      fillColor: 'transparent',
-                      fillOpacity: 0
+                      color: borderColor,
+                      weight: borderWeight,
+                      opacity: borderOpacity,
+                      fillColor,
+                      fillOpacity
                     });
                   }
                 },
@@ -535,32 +612,12 @@ export default function MapView({
                 <div className="font-bold text-slate-800 text-sm mb-2">{d.name}</div>
                 <div className="flex flex-col gap-1.5 min-w-[140px]">
                   <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500 capitalize">{level} {level === 'tertiary' ? 'Institutions' : 'Schools'}:</span>
-                    <span className="font-black text-blue-600">
-                      {level === 'primary' ? d.p_schools : level === 'secondary' ? d.s_schools : d.t_institutions}
-                    </span>
+                    <span className="text-slate-500">Total schools</span>
+                    <span className="font-black text-blue-600">{districtCount}</span>
                   </div>
                   <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500">Target Pop:</span>
-                    <span className="font-bold text-slate-700">
-                      {(level === 'primary' ? d.p_age_pop : level === 'secondary' ? d.s_age_pop : d.t_age_pop)?.toLocaleString() || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500">Total Pop:</span>
-                    <span className="font-bold text-slate-700">
-                      {d.total_population?.toLocaleString() || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="mt-1 pt-1 border-t border-slate-100 flex justify-between items-center">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Need Score</span>
-                    <span className="text-[10px] font-black text-red-500">
-                      {Math.round(calcScore(
-                        level === 'primary' ? d.p_age_pop : level === 'secondary' ? d.s_age_pop : d.t_age_pop,
-                        level === 'primary' ? d.p_schools : level === 'secondary' ? d.s_schools : d.t_institutions,
-                        level
-                      ))}
-                    </span>
+                    <span className="text-slate-500">Coverage</span>
+                    <span className="font-bold text-slate-700">{showHeatmap ? `${Math.round((districtCount/maxDistrictSchools)*100)}%` : `${level}`} </span>
                   </div>
                 </div>
               </Tooltip>
