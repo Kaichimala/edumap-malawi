@@ -11,12 +11,13 @@ const STAT_ICONS = {
 }
 
 export default function DetailPanel({ district, level, onClose }) {
-  const { schools } = useSchools()
+  const { allSchools } = useSchools()
   
-  // Get live counts from the actual map data instead of static district table
-  const primaryCount = (schools || []).filter(s => s.level?.toLowerCase() === 'primary').length
-  const secondaryCount = (schools || []).filter(s => s.level?.toLowerCase() === 'secondary').length
-  const tertiaryCount = (schools || []).filter(s => s.level?.toLowerCase() === 'tertiary').length
+  // Filter by this district's ID so counts are district-specific, not national totals
+  const districtSchools = (allSchools || []).filter(s => String(s.district_id) === String(district.id))
+  const primaryCount   = districtSchools.filter(s => s.level?.toLowerCase() === 'primary').length
+  const secondaryCount = districtSchools.filter(s => s.level?.toLowerCase() === 'secondary').length
+  const tertiaryCount  = districtSchools.filter(s => s.level?.toLowerCase() === 'tertiary').length
 
   const pop  = level === 'primary'   ? district.p_age_pop   :
                level === 'secondary' ? district.s_age_pop   : district.t_age_pop

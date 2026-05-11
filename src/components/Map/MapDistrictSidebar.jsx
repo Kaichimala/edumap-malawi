@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { calcScore, getNeedLevel } from '../../utils/scoring'
 import { HiOutlineSearch, HiOutlineChevronRight, HiOutlineChartBar, HiOutlineCheckCircle, HiOutlineEye, HiOutlineEyeOff, HiOutlineTrash } from 'react-icons/hi'
 import { MdConstruction } from 'react-icons/md'
-import { useSites } from '../../hooks/useSites'
 
 export default function MapDistrictSidebar({ 
   districts, 

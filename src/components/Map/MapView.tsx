@@ -470,7 +470,7 @@ export default function MapView({
           ) : (
             <HiDownload className="w-5 h-5" />
           )}
-          <span className="font-bold text-xs tracking-tight uppercase">Export Analysis</span>
+          <span className="font-bold text-xs tracking-tight uppercase">Tools & Export</span>
         </button>
       </div>
 

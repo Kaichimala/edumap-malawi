@@ -40,6 +40,7 @@ export default function MapViewPage() {
     sessionStorage.setItem('edumap_is_analyzed_map', isAnalyzed)
   }, [isAnalyzed])
 
+  // Auto re-run effect removed — all 3 levels are computed in one pass now
   const handleAnalysisComplete = () => {
     analyzedLevelRef.current = level
     setIsAnalyzed(true)

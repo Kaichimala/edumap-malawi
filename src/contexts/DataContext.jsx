@@ -67,27 +67,28 @@ export function DataProvider({ children }) {
 
   const fetchSchools = useCallback(async () => {
     try {
+      // Use the incoming table but attempt to get fields we need
       const { data, error: sbError } = await supabase
-        .from('api_schools_for_app')
-        .select('education_id, education_name, lat, lng, district_id, amenity, level, students')
+        .from('mwi_education_edumap')
+        .select('id, name, geometry, district_id, amenity')
       
       if (sbError) throw sbError
       
       const seenNames = new Set();
       const processed = (data || []).map(s => {
-        let lat = Number(s.lat);
-        let lng = Number(s.lng);
-        
-        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
+        let lat = 0, lng = 0;
+        if (s.geometry?.coordinates) {
+          lng = s.geometry.coordinates[0];
+          lat = s.geometry.coordinates[1];
+        }
+        if (!lat || !lng) return null;
 
-        const name = s.education_name || 'Unknown School';
+        const name = s.name || 'Unknown School';
         const noiseKeywords = ['BUILDING', 'HALL', 'OFFICE', 'STAFF', 'GATE', 'CLINIC', 'HOSTEL', 'HOUSE', 'MESS'];
         if (noiseKeywords.some(k => name.toUpperCase().includes(k))) return null;
 
-        let level = s.level;
-        if (!level || level === 'school') level = 'primary';
-        
-        let students = s.students || (level === 'primary' ? 400 : level === 'secondary' ? 280 : 8000);
+        let level = 'primary';
+        let students = 400;
         let displayName = name;
         const upperName = name.toUpperCase();
 
@@ -95,6 +96,7 @@ export function DataProvider({ children }) {
           level = 'tertiary';
           students = 8000;
           
+          // Fix: If it says University of Malawi but is in Blantyre (lng < 35.1), it's actually KUHeS
           const isKuhes = upperName.includes('COLLEGE OF MEDICINE') || 
                           upperName.includes('KUHES') || 
                           (upperName.includes('NURSING') && !upperName.includes('ZOMBA')) ||
@@ -120,15 +122,7 @@ export function DataProvider({ children }) {
         if (seenNames.has(uniqueKey)) return null;
         seenNames.add(uniqueKey);
 
-        return { 
-          id: s.education_id, 
-          name: displayName, 
-          lat, 
-          lng, 
-          district_id: s.district_id, 
-          level, 
-          students 
-        };
+        return { ...s, name: displayName, lat, lng, level, students };
       }).filter(Boolean);
 
       setSchools(processed)
@@ -381,7 +375,7 @@ export function DataProvider({ children }) {
         district_id: districtId, level: lvl,
         metrics: {
           distance: parseFloat(c.distToNearest.toFixed(1)),
-          slope: Math.floor(Math.random() * 8) + 2, // Within NESIP <15° range
+          slope: 5, // Conservative NESIP-compliant estimate (<15°); real DEM integration is a future enhancement
           hazard_risk: c.hazardRisk, 
           growth_demand: c.score > 20 ? 'Critical' : 'High'
         }
