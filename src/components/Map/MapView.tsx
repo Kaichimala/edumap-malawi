@@ -201,18 +201,26 @@ export default function MapView({
   
   const { schools, addSchool, removeSchool, getAllSchools } = useSchools()
   const { analysisSites, evaluatePointSuitability } = useData()
+  const allAvailableSchools = getAllSchools();
+  
+  // Dynamically calculate school counts per district from the actual imported data
+  const schoolCountsMap = useMemo(() => {
+    const counts = {};
+    (allAvailableSchools || []).forEach(s => {
+      if (s.district_id) {
+        counts[s.district_id] = (counts[s.district_id] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [allAvailableSchools]);
 
-  const districtSchoolCount = (district) => (
-    (Number(district.p_schools) || 0) +
-    (Number(district.s_schools) || 0) +
-    (Number(district.t_institutions) || 0)
-  )
+  const districtSchoolCount = (district) => schoolCountsMap[district.id] || 0;
 
   const maxDistrictSchools = Math.max(...(districts || []).map(d => districtSchoolCount(d)), 1)
   const heatThresholds = {
-    t1: Math.max(1, Math.ceil(maxDistrictSchools * 0.15)),
-    t2: Math.max(1, Math.ceil(maxDistrictSchools * 0.33)),
-    t3: Math.max(1, Math.ceil(maxDistrictSchools * 0.55)),
+    t1: Math.max(1, Math.ceil(maxDistrictSchools * 0.2)),
+    t2: Math.max(1, Math.ceil(maxDistrictSchools * 0.4)),
+    t3: Math.max(1, Math.ceil(maxDistrictSchools * 0.6)),
     t4: Math.max(1, Math.ceil(maxDistrictSchools * 0.8))
   }
 
