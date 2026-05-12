@@ -34,7 +34,7 @@ export default function MapViewPage() {
   const [isBuildMode, setIsBuildMode] = useState(false)
   const [isDestroyMode, setIsDestroyMode] = useState(false)
   const [showSites, setShowSites] = useState(true)
-  const [visibleLevels, setVisibleLevels] = useState(['primary']) // Multi-level toggle state
+  const [visibleLevels, setVisibleLevels] = useState(['primary', 'secondary', 'tertiary']) // Show all school levels by default
 
   // Track the level that was last analyzed (to detect real changes)
   const analyzedLevelRef = useRef(null)

@@ -610,14 +610,38 @@ export default function MapView({
             >
               <Tooltip sticky className="bg-white/90 backdrop-blur border border-slate-200 shadow-xl rounded-xl p-3">
                 <div className="font-bold text-slate-800 text-sm mb-2">{d.name}</div>
-                <div className="flex flex-col gap-1.5 min-w-[140px]">
-                  <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500">Total schools</span>
-                    <span className="font-black text-blue-600">{districtCount}</span>
+                <div className="flex flex-col gap-1.5 min-w-[160px]">
+                  <div className="flex justify-between gap-4 text-[10px]">
+                    <span className="text-slate-500 font-medium">Total Population</span>
+                    <span className="font-bold text-slate-700">{(d.total_population || 0).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between gap-4 text-xs">
-                    <span className="text-slate-500">Coverage</span>
-                    <span className="font-bold text-slate-700">{showHeatmap ? `${Math.round((districtCount/maxDistrictSchools)*100)}%` : `${level}`} </span>
+                  
+                  {(() => {
+                    const pop = level === 'primary' ? d.p_age_pop : 
+                                level === 'secondary' ? d.s_age_pop : d.t_age_pop;
+                    const inst = level === 'primary' ? d.p_schools : 
+                                 level === 'secondary' ? d.s_schools : d.t_institutions;
+                    const score = calcScore(pop, inst, level);
+                    
+                    return (
+                      <>
+                        <div className="flex justify-between gap-4 text-[10px]">
+                          <span className="text-slate-500 font-medium">Target ({level})</span>
+                          <span className="font-bold text-slate-700">{(pop || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between gap-4 text-[10px] pt-1 border-t border-slate-100 mt-1">
+                          <span className="text-slate-500 font-bold uppercase tracking-tighter">Coverage Score</span>
+                          <span className={`font-black ${score < 40 ? 'text-red-600' : score < 70 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {score.toFixed(1)}%
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  <div className="flex justify-between gap-4 text-[10px] mt-1 pt-1 border-t border-slate-100">
+                    <span className="text-slate-500 font-medium">Existing Facilities</span>
+                    <span className="font-black text-blue-600">{districtCount}</span>
                   </div>
                 </div>
               </Tooltip>
@@ -629,9 +653,11 @@ export default function MapView({
         <MapClickHandler active={isBuildMode} onLocationSelect={setNewSchoolLoc} />
 
         {/* Existing & User-Added Schools (Filtered by visibleLevels) */}
-        {showMarkers && (schools || [])
-          .filter(s => visibleLevels.includes(s.level) || s.isUserAdded)
-          .map(s => {
+        {showMarkers && (() => {
+          const visibleSchools = (schools || []).filter(s => visibleLevels.includes(s.level) || s.isUserAdded);
+          console.log('[MapView] Schools to render:', visibleSchools.length, 'from', (schools || []).length, 'total, visibleLevels:', visibleLevels);
+          return visibleSchools;
+        })().map(s => {
             let markerColor = '#22c55e'; // Default Green
             if (s.isUserAdded) {
               markerColor = '#f59e0b'; // Amber

@@ -1,7 +1,6 @@
 import { useDistricts } from '../hooks/useDistricts'
 import { useSchools } from '../hooks/useSchools'
-import { useSites } from '../hooks/useSites'
-import { calcScore, getNeedLevel } from '../utils/scoring'
+import { calcScore } from '../utils/scoring'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -13,10 +12,10 @@ const COLORS = ['#1a5276', '#28b463', '#e67e22', '#e74c3c'];
 export default function Dashboard() {
   const navigate = useNavigate()
   const { districts, loading: dLoading } = useDistricts()
+  const { allSchools } = useSchools()
   
-  // Aggregate data for stats
-  const totalSchools = districts.reduce((acc, d) => 
-    acc + (Number(d.p_schools) || 0) + (Number(d.s_schools) || 0) + (Number(d.t_institutions) || 0), 0)
+  // Total schools from actual school data
+  const totalSchools = (allSchools || []).length
   const totalDistricts = districts.length
   const totalPopulation = districts.reduce((acc, d) => acc + (Number(d.total_population) || 0), 0)
   const criticalDistricts = districts.filter(d => calcScore(Number(d.p_age_pop) || 0, Number(d.p_schools) || 0, 'primary') >= 80)
@@ -30,11 +29,11 @@ export default function Dashboard() {
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
 
-  // Data for Pie Chart: Level Distribution
+  // Data for Pie Chart: Level Distribution from actual schools
   const pieData = [
-    { name: 'Primary', value: districts.reduce((acc, d) => acc + (Number(d.p_schools) || 0), 0) },
-    { name: 'Secondary', value: districts.reduce((acc, d) => acc + (Number(d.s_schools) || 0), 0) },
-    { name: 'Tertiary', value: districts.reduce((acc, d) => acc + (Number(d.t_institutions) || 0), 0) },
+    { name: 'Primary', value: (allSchools || []).filter(s => s.level === 'primary').length },
+    { name: 'Secondary', value: (allSchools || []).filter(s => s.level === 'secondary').length },
+    { name: 'Tertiary', value: (allSchools || []).filter(s => s.level === 'tertiary').length },
   ]
 
   if (dLoading) return <div className="p-8 text-center animate-pulse text-slate-500">Loading Dashboard Data...</div>
@@ -176,4 +175,4 @@ function StatCard({ title, value, subValue, icon, color = "text-slate-800" }) {
       </div>
     </div>
   )
-}
+}

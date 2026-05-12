@@ -111,29 +111,55 @@ export function DataProvider({ children }) {
 
   const fetchSchools = useCallback(async () => {
     try {
-      const { data, error: sbError } = await supabase
-        .from('mwi_schools_shp')
-        .select('school_id, school_name, status, district, xcoord, ycoord')
+      let allData = [];
+      let page = 0;
+      const PAGE_SIZE = 1000;
+      let hasMore = true;
 
-      if (sbError) {
-        throw sbError
+      console.log('[DataContext] Starting multi-page fetch from mwi_schools_with_districts...');
+
+      while (hasMore) {
+        const { data, error: sbError } = await supabase
+          .from('mwi_schools_with_districts')
+          .select('gid, objectid, school_id, school_nam, status, district, xcoord, ycoord')
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (sbError) throw sbError;
+        
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          allData = [...allData, ...data];
+          if (data.length < PAGE_SIZE) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
       }
 
+      console.log(`[DataContext] Total raw records fetched: ${allData.length}`);
+
       const districtMap = districtsRef.current.reduce((acc, d) => {
-        if (d.name) acc[d.name.toLowerCase()] = d.id
+        if (d.name) {
+          acc[d.name.toLowerCase()] = d.id
+          const simplified = d.name.toLowerCase().replace(' city', '').replace(' rural', '').replace(' north', '').replace(' south', '').trim()
+          acc[simplified] = d.id
+        }
         return acc
       }, {})
 
-      const seenNames = new Set();
-      const processed = (data || []).map(s => {
+      const seenIds = new Set();
+      const processed = allData.map((s, index) => {
         const x = Number(s.xcoord)
         const y = Number(s.ycoord)
+        
         if (isNaN(x) || isNaN(y) || x === 0 || y === 0) return null
 
         const [lat, lng] = utmToLatLng(x, y, 36, true)
         if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
 
-        const name = s.school_name || 'Unknown School'
+        const name = s.school_nam || 'Unknown School'
         const upperName = name.toUpperCase()
 
         let level = 'primary'
@@ -143,25 +169,35 @@ export function DataProvider({ children }) {
           level = 'tertiary'
         }
 
-        const uniqueKey = `${name}-${level}`
-        if (seenNames.has(uniqueKey)) return null
-        seenNames.add(uniqueKey)
+        const internalId = s.gid || s.objectid || `idx-${index}`;
+        const uniqueId = `mwi-${internalId}`;
+
+        if (seenIds.has(uniqueId)) return null
+        seenIds.add(uniqueId)
+
+        const rawDistrict = (s.district || '').toLowerCase();
+        let districtId = districtMap[rawDistrict];
+        if (!districtId) {
+          const simplified = rawDistrict.replace(' city', '').replace(' rural', '').replace(' north', '').replace(' south', '').trim();
+          districtId = districtMap[simplified];
+        }
 
         return {
-          id: `mwi-${s.school_id}`,
+          id: uniqueId,
           name,
           lat,
           lng,
-          district_id: districtMap[(s.district || '').toLowerCase()] ?? null,
+          district_id: districtId ?? null,
           district_name: s.district || null,
           level,
           students: level === 'primary' ? 400 : level === 'secondary' ? 280 : 8000
         }
       }).filter(Boolean)
 
+      console.log(`[DataContext] Successfully processed ${processed.length} schools.`);
       setSchools(processed)
     } catch (err) {
-      console.error("Error fetching schools from mwi_schools_shp:", err)
+      console.error("Error fetching schools from mwi_schools_with_districts:", err)
       // fall back to the existing app-level school view if the new table query fails
       try {
         const { data, error: fallbackError } = await supabase
