@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useMemo } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap, Marker, Popup, useMapEvents, Circle, Polyline, GeoJSON } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -293,7 +293,6 @@ export default function MapView({
     }
   }
 
-  const allAvailableSchools = getAllSchools();
   const filteredSchoolsToDestroy = destroySearch.length > 0 
     ? allAvailableSchools.filter(s => s.name.toLowerCase().includes(destroySearch.toLowerCase().trim()))
     : [];

@@ -111,34 +111,40 @@ export function DataProvider({ children }) {
 
   const fetchSchools = useCallback(async () => {
     try {
-      let allData = [];
-      let page = 0;
+      // 1. Get the total count first to plan parallel fetching
+      const { count, error: countError } = await supabase
+        .from('mwi_schools_with_districts')
+        .select('*', { count: 'exact', head: true });
+
+      if (countError) throw countError;
+
       const PAGE_SIZE = 1000;
-      let hasMore = true;
+      const totalRecords = count || 0;
+      const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
 
-      console.log('[DataContext] Starting multi-page fetch from mwi_schools_with_districts...');
+      console.log(`[DataContext] Total schools to fetch: ${totalRecords} (${totalPages} pages)`);
 
-      while (hasMore) {
-        const { data, error: sbError } = await supabase
-          .from('mwi_schools_with_districts')
-          .select('gid, objectid, school_id, school_nam, status, district, xcoord, ycoord')
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-        if (sbError) throw sbError;
-        
-        if (!data || data.length === 0) {
-          hasMore = false;
-        } else {
-          allData = [...allData, ...data];
-          if (data.length < PAGE_SIZE) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        }
+      // 2. Fetch all pages in parallel for maximum speed
+      const fetchPromises = [];
+      for (let i = 0; i < totalPages; i++) {
+        fetchPromises.push(
+          supabase
+            .from('mwi_schools_with_districts')
+            .select('gid, objectid, school_id, school_nam, status, district, xcoord, ycoord')
+            .range(i * PAGE_SIZE, (i + 1) * PAGE_SIZE - 1)
+        );
       }
 
-      console.log(`[DataContext] Total raw records fetched: ${allData.length}`);
+      const results = await Promise.all(fetchPromises);
+      
+      // Combine results and handle any errors in individual pages
+      let allData = [];
+      for (const res of results) {
+        if (res.error) throw res.error;
+        if (res.data) allData = [...allData, ...res.data];
+      }
+
+      console.log(`[DataContext] Parallel fetch complete. Total raw: ${allData.length}`);
 
       const districtMap = districtsRef.current.reduce((acc, d) => {
         if (d.name) {
@@ -156,7 +162,7 @@ export function DataProvider({ children }) {
         
         if (isNaN(x) || isNaN(y) || x === 0 || y === 0) return null
 
-        const [lat, lng] = utmToLatLng(x, y, 36, true)
+        const [lat, lng] = utmToLatLng(x, y, 36, true) 
         if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
 
         const name = s.school_nam || 'Unknown School'
@@ -564,9 +570,15 @@ export function DataProvider({ children }) {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    await fetchDistricts()
-    await Promise.all([fetchSchools(), fetchGlobalSites()])
-    setLoading(false)
+    try {
+      await fetchDistricts()
+      await Promise.all([fetchSchools(), fetchGlobalSites()])
+    } catch (err) {
+      console.error("Critical error during initial data fetch:", err)
+      setError(err)
+    } finally {
+      setLoading(false)
+    }
   }, [fetchDistricts, fetchSchools, fetchGlobalSites])
 
   useEffect(() => {
