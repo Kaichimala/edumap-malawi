@@ -28,24 +28,41 @@ export default function DetailPanel({ district, level, onClose }) {
   const need    = getNeedLevel(score)
   const newInst = getRecommendedNew(pop, inst, level)
   const instLabel = level === 'tertiary' ? 'Institutions' : 'Schools'
-
-  // Drag state
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  
+  // States: Position, Size, Minimized
+  const [position, setPosition] = useState({ x: 340, y: 16 }); // Initial: Right of sidebar
+  const [width, setWidth] = useState(320); // Default width: 80 (320px)
+  const [isMinimized, setIsMinimized] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   const handleMouseDown = (e) => {
+    if (e.target.closest('.resize-handle')) return; // Don't drag if resizing
     setDragging(true);
     setOffset({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
 
+  const handleResizeMouseDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizing(true);
+  };
+
   const handleMouseMove = (e) => {
-    if (!dragging) return;
-    setPosition({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+    if (dragging) {
+      setPosition({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+    } else if (resizing) {
+      const newWidth = e.clientX - position.x;
+      if (newWidth > 200 && newWidth < 600) {
+        setWidth(newWidth);
+      }
+    }
   };
 
   const handleMouseUp = () => {
     setDragging(false);
+    setResizing(false);
   };
 
   useEffect(() => {
@@ -55,32 +72,66 @@ export default function DetailPanel({ district, level, onClose }) {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, offset]);
+  }, [dragging, resizing, offset, position]);
 
   return (
     <div
-      className="w-80 bg-white h-full overflow-y-auto border-l border-slate-200 shadow-xl flex flex-col cursor-move z-50"
-      style={{ position: 'absolute', left: position.x, top: position.y }}
-      onMouseDown={handleMouseDown}
+      className={`bg-white rounded-2xl border border-slate-200 shadow-2xl flex flex-col z-[3000] overflow-hidden transition-shadow ${isMinimized ? 'h-14' : 'h-[500px]'}`}
+      style={{ 
+        position: 'absolute', 
+        left: position.x, 
+        top: position.y, 
+        width: isMinimized ? '200px' : `${width}px`,
+        cursor: dragging ? 'grabbing' : 'auto'
+      }}
     >
-      {/* Accent bar shifted to neutral */}
-      <div className="h-1.5 w-full bg-slate-200" />
-
-      {/* Title row */}
-      <div className="flex justify-between items-start px-5 pt-5 pb-4">
-        <div>
-          <h2 className="font-bold text-brand-900 text-lg leading-tight">{district.name}</h2>
-          <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold text-slate-500 bg-slate-100">
-            Active Planning
-          </span>
+      {/* Drag/Header area */}
+      <div 
+        className="flex justify-between items-center px-4 py-3 bg-slate-50 border-b border-slate-100 cursor-grab active:cursor-grabbing select-none"
+        onMouseDown={handleMouseDown}
+      >
+        <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex flex-col gap-0.5 opacity-20 shrink-0">
+             <div className="w-3 h-0.5 bg-slate-900 rounded-full"></div>
+             <div className="w-3 h-0.5 bg-slate-900 rounded-full"></div>
+          </div>
+          <h2 className="font-black text-slate-800 text-xs uppercase tracking-widest truncate">{district.name}</h2>
+          {isMinimized && <span className="text-[10px] font-bold text-[#1a5276]">Minimized</span>}
         </div>
-        <button
-          onClick={onClose}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-brand-700 transition-colors"
-        >
-          <IoClose className="w-5 h-5" />
-        </button>
+        
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setIsMinimized(!isMinimized)}
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200 transition-colors"
+            title={isMinimized ? "Expand" : "Minimize"}
+          >
+            {isMinimized ? (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
+              </svg>
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            <IoClose className="w-5 h-5" />
+          </button>
+        </div>
       </div>
+
+      {!isMinimized && (
+        <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-100 border border-slate-200">
+                Active Planning
+              </span>
+            </div>
 
       {/* Stats */}
       <div className="px-5 pb-5 space-y-3">
@@ -125,12 +176,23 @@ export default function DetailPanel({ district, level, onClose }) {
         </p>
       </div>
 
-      {/* Footer */}
-      <div className="px-5 py-3 bg-brand-50 border-t border-slate-100">
-        <p className="text-[11px] text-slate-400 text-center">
-          Data based on MoE guidelines · {level.charAt(0).toUpperCase() + level.slice(1)} level
-        </p>
-      </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {level} Level Context
+            </p>
+            <div 
+              className="resize-handle w-4 h-4 cursor-nwse-resize flex flex-col items-end justify-end gap-0.5 opacity-20 hover:opacity-50 transition-opacity"
+              onMouseDown={handleResizeMouseDown}
+            >
+              <div className="w-3 h-0.5 bg-slate-900 rounded-full rotate-[-45deg]"></div>
+              <div className="w-1.5 h-0.5 bg-slate-900 rounded-full rotate-[-45deg]"></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

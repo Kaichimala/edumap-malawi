@@ -11,6 +11,7 @@ import SchoolsPage from './pages/SchoolsPage'
 import SitesPage from './pages/SitesPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import DataManagementPage from './pages/DataManagementPage'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/districts" element={<DistrictsPage />} />
               <Route path="/schools" element={<SchoolsPage />} />
               <Route path="/sites" element={<Navigate to="/map" replace />} />
+              <Route path="/data" element={<DataManagementPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>

@@ -1,9 +1,22 @@
-# React + Vite
+## EduMap Malawi - MIS
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A geospatial Management Information System for school planning in Malawi.
 
-Currently, two official plugins are available:
+### Features
+- **Interactive Map**: Visualize school locations and district boundaries.
+- **Data Management**: Upload new datasets (CSV, GeoJSON, Shapefiles) directly to Supabase.
+- **Reporting**: Generate insights on school accessibility and suitability.
 
+### Data Management Setup
+To use the data upload feature, you must have the Python backend running:
+
+1.  **Requirements**: Ensure you have Python installed with the GIS stack (GeoPandas, SQLAlchemy, etc.).
+2.  **Start Backend**: Run the `start_backend.bat` file in the root directory.
+3.  **Frontend**: Navigate to the **Data Management** page in the app sidebar.
+
+The backend handles CRS conversion (to EPSG:4326) and spatial indexing automatically.
+
+### Expansion
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 

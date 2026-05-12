@@ -1,5 +1,6 @@
 import { useDistricts } from '../hooks/useDistricts'
 import { useSchools } from '../hooks/useSchools'
+import { useData } from '../contexts/DataContext'
 import { calcScore } from '../utils/scoring'
 import { 
 
@@ -7,6 +8,16 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts'
 import { useNavigate } from 'react-router-dom'
+import { 
+  HiOutlineDatabase, 
+  HiOutlineChevronRight,
+  HiOutlineOfficeBuilding,
+  HiOutlineFlag,
+  HiOutlineUsers,
+  HiOutlineLocationMarker,
+  HiOutlineMap,
+  HiOutlineExclamationCircle
+} from 'react-icons/hi'
 
 const COLORS = ['#1a5276', '#28b463', '#e67e22', '#e74c3c'];
 
@@ -14,7 +25,8 @@ const COLORS = ['#1a5276', '#28b463', '#e67e22', '#e74c3c'];
 export default function Dashboard() {
   const navigate = useNavigate()
   const { districts, loading: dLoading } = useDistricts()
-  const { allSchools } = useSchools()
+  const { allSchools, loading: sLoading } = useSchools()
+  const { datasets, selectedDatasetId, setSelectedDatasetId } = useData()
   
   // Total schools from actual school data
   const totalSchools = (allSchools || []).length
@@ -39,16 +51,42 @@ export default function Dashboard() {
     { name: 'Tertiary', value: (allSchools || []).filter(s => s.level === 'tertiary').length },
   ]
 
-  if (dLoading) return <div className="p-8 text-center animate-pulse text-slate-500">Loading Dashboard Data...</div>
+  if (dLoading || sLoading) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+      <div className="w-12 h-12 border-4 border-[#1a5276]/20 border-t-[#1a5276] rounded-full animate-spin" />
+      <p className="text-slate-500 font-bold animate-pulse">Syncing with {datasets?.find(ds => ds.id === selectedDatasetId)?.name}...</p>
+    </div>
+  )
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Dashboard Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Executive Dashboard</h1>
+          <p className="text-sm text-slate-500">National School Facility Analysis & Planning</p>
+        </div>
+
+        <div className="flex items-center gap-3 bg-white p-2 pl-4 rounded-2xl border border-slate-200 shadow-sm">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Active Dataset</span>
+          <select 
+            value={selectedDatasetId}
+            onChange={(e) => setSelectedDatasetId(e.target.value)}
+            className="bg-slate-50 border-none rounded-xl px-4 py-2 text-sm font-bold text-[#1a5276] focus:ring-2 focus:ring-[#1a5276]/10 outline-none cursor-pointer hover:bg-slate-100 transition-all"
+          >
+            {datasets?.map(ds => (
+              <option key={ds.id} value={ds.id}>{ds.id}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Schools" value={totalSchools.toLocaleString()} subValue="Facility Inventory" icon="🏫" />
-        <StatCard title="Total Districts" value={totalDistricts} subValue="Administrative Units" icon="🇲🇼" />
-        <StatCard title="Total Population" value={totalPopulation.toLocaleString()} subValue="National Census Data" icon="👥" color="text-green-600" />
-        <StatCard title="Recommended Sites" value="142" subValue="Planning Pointers" icon="📍" />
+        <StatCard title="Total Schools" value={totalSchools.toLocaleString()} subValue="Facility Inventory" icon={<HiOutlineOfficeBuilding />} />
+        <StatCard title="Total Districts" value={totalDistricts} subValue="Administrative Units" icon={<HiOutlineFlag />} />
+        <StatCard title="Total Population" value={totalPopulation.toLocaleString()} subValue="National Census Data" icon={<HiOutlineUsers />} color="text-green-600" />
+        <StatCard title="Recommended Sites" value="142" subValue="Planning Pointers" icon={<HiOutlineLocationMarker />} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -108,7 +146,7 @@ export default function Dashboard() {
         {/* Insights Section */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <span className="w-2 h-6 bg-red-500 rounded-full" />
+            <HiOutlineExclamationCircle className="w-6 h-6 text-red-500" />
             Critical Districts Insights
           </h3>
           <div className="space-y-4">
@@ -130,36 +168,54 @@ export default function Dashboard() {
         </div>
 
         {/* Map Preview Section */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="font-bold text-slate-800 mb-6">Spatial Context</h3>
-          <div className="relative group overflow-hidden rounded-xl border border-slate-100 bg-slate-50 h-56 flex items-center justify-center">
-             {/* Thumbnail Placeholder - in a real app this would be a static map image */}
+        <div className="space-y-8">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 className="font-bold text-slate-800 mb-6">Spatial Context</h3>
+            <div className="relative group overflow-hidden rounded-xl border border-slate-100 bg-slate-50 h-56 flex items-center justify-center">
+               {/* Thumbnail Placeholder - in a real app this would be a static map image */}
              <div className="text-center p-8">
-               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">🌍</div>
+               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl text-[#1a5276]">
+                 <HiOutlineMap />
+               </div>
                <p className="text-sm font-semibold text-slate-600">Interactive Map Preview</p>
                <p className="text-xs text-slate-400 mt-1">Overlaying 28 districts and 142 recommended sites</p>
              </div>
-             
-             <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <button 
-                  onClick={() => navigate('/map')}
-                  className="px-6 py-2 bg-[#1a5276] text-white font-bold rounded-full shadow-xl hover:scale-105 transition-transform"
-                >
-                  Open Full GIS Map
-                </button>
-             </div>
+               
+               <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <button 
+                    onClick={() => navigate('/map')}
+                    className="px-6 py-2 bg-[#1a5276] text-white font-bold rounded-full shadow-xl hover:scale-105 transition-transform"
+                  >
+                    Open Full GIS Map
+                  </button>
+               </div>
+            </div>
+            
+            <div className="mt-6 flex items-center justify-between pt-4 border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Data Updated: Today, 08:32 AM</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-[#1a5276] rounded-full" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">MIS Sync: Active</span>
+              </div>
+            </div>
           </div>
-          
-          <div className="mt-6 flex items-center justify-between pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Data Updated: Today, 08:32 AM</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-[#1a5276] rounded-full" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">MIS Sync: Active</span>
 
+          {/* Data Management CTA */}
+          <div className="bg-gradient-to-br from-[#1a5276] to-[#154360] p-6 rounded-2xl shadow-lg border border-white/10 text-white group cursor-pointer hover:scale-[1.02] transition-all"
+               onClick={() => navigate('/data')}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl group-hover:bg-white/20 transition-colors">
+                <HiOutlineDatabase />
+              </div>
+              <HiOutlineChevronRight className="w-6 h-6 text-white/40 group-hover:translate-x-1 transition-transform" />
             </div>
+            <h3 className="font-bold text-lg">Data Management</h3>
+            <p className="text-white/60 text-xs mt-1 leading-relaxed">
+              Upload new geospatial datasets, update facility inventories, and manage system tables.
+            </p>
           </div>
         </div>
       </div>
@@ -176,9 +232,8 @@ function StatCard({ title, value, subValue, icon, color = "text-slate-800" }) {
           <p className={`text-3xl font-black ${color} group-hover:text-[#1a5276] transition-colors`}>{value}</p>
           <p className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-tight">{subValue}</p>
         </div>
-        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-2xl group-hover:bg-blue-50 transition-colors">
+        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-2xl text-slate-400 group-hover:bg-blue-50 group-hover:text-[#1a5276] transition-all">
           {icon}
-
         </div>
       </div>
     </div>

@@ -18,6 +18,45 @@ export function DataProvider({ children }) {
   // Navigation Memory
   const [selectedDistrictId, setSelectedDistrictId] = useState(null)
   const [level, setLevel] = useState('primary')
+  const [selectedDatasetId, setSelectedDatasetId] = useState('mwi_schools_with_districts')
+
+  const [availableDatasets, setAvailableDatasets] = useState([
+    { id: 'mwi_schools_with_districts', name: 'Official 2024 Inventory', description: 'Verified Ministry of Education school list' },
+    { id: 'api_schools_for_app', name: 'Legacy GIS Data', description: 'OpenStreetMap and Historical Records' }
+  ])
+
+  const fetchAvailableDatasets = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:8000/datasets')
+      if (!response.ok) throw new Error('Backend unavailable')
+      const data = await response.json()
+      
+      if (data && data.length > 0) {
+        const dbDatasets = data.map(d => ({
+          id: d.table_name,
+          name: d.display_name || d.table_name,
+          description: `${d.record_count?.toLocaleString()} records • ${new Date(d.created_at).toLocaleDateString()}`
+        }))
+        
+        // Combine DB datasets with hardcoded ones, avoiding duplicates
+        setAvailableDatasets(prev => {
+          const combined = [...dbDatasets]
+          prev.forEach(p => {
+            if (!combined.some(c => c.id === p.id)) {
+              combined.push(p)
+            }
+          })
+          return combined
+        })
+      }
+    } catch (e) {
+      console.warn("Dynamic dataset fetch skipped:", e.message)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchAvailableDatasets()
+  }, [fetchAvailableDatasets])
 
   const utmToLatLng = (easting, northing, zone = 36, southernHemisphere = true) => {
     const a = 6378137.0
@@ -113,7 +152,7 @@ export function DataProvider({ children }) {
     try {
       // 1. Get the total count first to plan parallel fetching
       const { count, error: countError } = await supabase
-        .from('mwi_schools_with_districts')
+        .from(selectedDatasetId)
         .select('*', { count: 'exact', head: true });
 
       if (countError) throw countError;
@@ -126,11 +165,15 @@ export function DataProvider({ children }) {
 
       // 2. Fetch all pages in parallel for maximum speed
       const fetchPromises = [];
+      const columns = selectedDatasetId === 'api_schools_for_app' 
+        ? 'education_id, education_name, lat, lng, district_id, amenity, level, students'
+        : 'gid, objectid, school_id, school_nam, status, district, xcoord, ycoord';
+
       for (let i = 0; i < totalPages; i++) {
         fetchPromises.push(
           supabase
-            .from('mwi_schools_with_districts')
-            .select('gid, objectid, school_id, school_nam, status, district, xcoord, ycoord')
+            .from(selectedDatasetId)
+            .select(columns)
             .range(i * PAGE_SIZE, (i + 1) * PAGE_SIZE - 1)
         );
       }
@@ -158,63 +201,8 @@ export function DataProvider({ children }) {
 
       const seenIds = new Set();
       const processed = allData.map((s, index) => {
-        const x = Number(s.xcoord)
-        const y = Number(s.ycoord)
-        
-        if (isNaN(x) || isNaN(y) || x === 0 || y === 0) return null
-
-        const [lat, lng] = utmToLatLng(x, y, 36, true) 
-        if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
-
-        const name = s.school_nam || 'Unknown School'
-        const upperName = name.toUpperCase()
-
-        let level = 'primary'
-        if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
-          level = 'secondary'
-        } else if (s.status?.toUpperCase() === 'TERTIARY' || upperName.includes('UNIVERSITY') || upperName.includes('COLLEGE') || upperName.includes('INSTITUTE')) {
-          level = 'tertiary'
-        }
-
-        const internalId = s.gid || s.objectid || `idx-${index}`;
-        const uniqueId = `mwi-${internalId}`;
-
-        if (seenIds.has(uniqueId)) return null
-        seenIds.add(uniqueId)
-
-        const rawDistrict = (s.district || '').toLowerCase();
-        let districtId = districtMap[rawDistrict];
-        if (!districtId) {
-          const simplified = rawDistrict.replace(' city', '').replace(' rural', '').replace(' north', '').replace(' south', '').trim();
-          districtId = districtMap[simplified];
-        }
-
-        return {
-          id: uniqueId,
-          name,
-          lat,
-          lng,
-          district_id: districtId ?? null,
-          district_name: s.district || null,
-          level,
-          students: level === 'primary' ? 400 : level === 'secondary' ? 280 : 8000
-        }
-      }).filter(Boolean)
-
-      console.log(`[DataContext] Successfully processed ${processed.length} schools.`);
-      setSchools(processed)
-    } catch (err) {
-      console.error("Error fetching schools from mwi_schools_with_districts:", err)
-      // fall back to the existing app-level school view if the new table query fails
-      try {
-        const { data, error: fallbackError } = await supabase
-          .from('api_schools_for_app')
-          .select('education_id, education_name, lat, lng, district_id, amenity, level, students')
-
-        if (fallbackError) throw fallbackError
-
-        const seenNames = new Set();
-        const processed = (data || []).map(s => {
+        if (selectedDatasetId === 'api_schools_for_app') {
+          // --- LEGACY FORMAT PROCESSING ---
           let lat = Number(s.lat);
           let lng = Number(s.lng);
           if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
@@ -233,34 +221,23 @@ export function DataProvider({ children }) {
           if (s.amenity === 'university' || s.amenity === 'college' || ['UNIVERSITY', 'COLLEGE', 'FACULTY', 'POLYTECHNIC', 'INSTITUTE', 'TRAINING CENTRE'].some(k => upperName.includes(k))) {
             level = 'tertiary';
             students = 8000;
-
-            const isKuhes = upperName.includes('COLLEGE OF MEDICINE') || 
-                            upperName.includes('KUHES') || 
-                            (upperName.includes('NURSING') && !upperName.includes('ZOMBA')) ||
-                            (upperName.includes('UNIVERSITY OF MALAWI') && lng < 35.1);
-
-            if (isKuhes) {
-              displayName = 'Kamuzu University of Health Sciences (KUHeS)';
-            } else if (upperName.includes('CHANCELLOR') || upperName.includes('UNIVERSITY OF MALAWI') || upperName.includes('UNIMA') || upperName.includes('FACULTY') || upperName.includes('CENTRE')) {
-              displayName = 'University of Malawi (UNIMA)';
-            } else if (upperName.includes('POLYTECHNIC') || upperName.includes('MUBAS') || upperName.includes('BUSINESS AND APPLIED')) {
-              displayName = 'Malawi University of Business and Applied Sciences (MUBAS)';
-            } else if (upperName.includes('MZUZU UNIVERSITY') || upperName.includes('MZUNI')) {
-              displayName = 'Mzuzu University (MZUNI)';
-            } else if (upperName.includes('LUANAR') || upperName.includes('BUNDUNDA') || upperName.includes('NATURAL RESOURCES')) {
-              displayName = 'LUANAR';
-            }
+            // Tertiary simplification logic
+            if (upperName.includes('COLLEGE OF MEDICINE') || upperName.includes('KUHES')) displayName = 'Kamuzu University of Health Sciences (KUHeS)';
+            else if (upperName.includes('UNIVERSITY OF MALAWI') || upperName.includes('UNIMA')) displayName = 'University of Malawi (UNIMA)';
+            else if (upperName.includes('POLYTECHNIC') || upperName.includes('MUBAS')) displayName = 'Malawi University of Business and Applied Sciences (MUBAS)';
+            else if (upperName.includes('MZUZU UNIVERSITY') || upperName.includes('MZUNI')) displayName = 'Mzuzu University (MZUNI)';
+            else if (upperName.includes('LUANAR')) displayName = 'LUANAR';
           } else if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
             level = 'secondary';
             students = 280;
           }
 
-          const uniqueKey = `${displayName}-${level}`
-          if (seenNames.has(uniqueKey)) return null
-          seenNames.add(uniqueKey)
+          const uniqueId = `legacy-${s.education_id || index}`;
+          if (seenIds.has(uniqueId)) return null;
+          seenIds.add(uniqueId);
 
           return {
-            id: s.education_id,
+            id: uniqueId,
             name: displayName,
             lat,
             lng,
@@ -268,14 +245,59 @@ export function DataProvider({ children }) {
             level,
             students
           }
-        }).filter(Boolean)
+        } else {
+          // --- OFFICIAL 2024 FORMAT (UTM) ---
+          const x = Number(s.xcoord)
+          const y = Number(s.ycoord)
+          
+          if (isNaN(x) || isNaN(y) || x === 0 || y === 0) return null
 
-        setSchools(processed)
-      } catch (fallbackErr) {
-        console.error("Fallback error fetching schools:", fallbackErr)
-      }
+          const [lat, lng] = utmToLatLng(x, y, 36, true) 
+          if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
+
+          const name = s.school_nam || 'Unknown School'
+          const upperName = name.toUpperCase()
+
+          let level = 'primary'
+          if (['SECONDARY', 'CDSS', 'HIGH SCHOOL', 'S.S.S', 'S.S'].some(k => upperName.includes(k))) {
+            level = 'secondary'
+          } else if (s.status?.toUpperCase() === 'TERTIARY' || upperName.includes('UNIVERSITY') || upperName.includes('COLLEGE') || upperName.includes('INSTITUTE')) {
+            level = 'tertiary'
+          }
+
+          const internalId = s.gid || s.objectid || `idx-${index}`;
+          const uniqueId = `mwi-${internalId}`;
+
+          if (seenIds.has(uniqueId)) return null
+          seenIds.add(uniqueId)
+
+          const rawDistrict = (s.district || '').toLowerCase();
+          let districtId = districtMap[rawDistrict];
+          if (!districtId) {
+            const simplified = rawDistrict.replace(' city', '').replace(' rural', '').replace(' north', '').replace(' south', '').trim();
+            districtId = districtMap[simplified];
+          }
+
+          return {
+            id: uniqueId,
+            name,
+            lat,
+            lng,
+            district_id: districtId ?? null,
+            district_name: s.district || null,
+            level,
+            students: level === 'primary' ? 400 : level === 'secondary' ? 280 : 8000
+          }
+        }
+      }).filter(Boolean)
+
+      console.log(`[DataContext] Successfully processed ${processed.length} schools.`);
+      setSchools(processed)
+    } catch (err) {
+      console.error(`Error fetching schools from ${selectedDatasetId}:`, err)
+      // Fallback logic if needed, but now we allow choosing specifically
     }
-  }, [])
+  }, [selectedDatasetId])
 
   const fetchGlobalSites = useCallback(async () => {
     try {
@@ -590,6 +612,7 @@ export function DataProvider({ children }) {
   const contextValue = useMemo(() => ({
     districts,
     schools,
+    allSchools: schools,
     sites,
     analysisSites,
     loading,
@@ -598,11 +621,15 @@ export function DataProvider({ children }) {
     setSelectedDistrictId,
     level,
     setLevel,
+    selectedDatasetId,
+    setSelectedDatasetId,
+    datasets: availableDatasets,
+    refreshDatasets: fetchAvailableDatasets,
     refreshData: fetchData,
     runSpatialAnalysis,
     evaluatePointSuitability,
     clearAnalysisSites
-  }), [districts, schools, sites, analysisSites, loading, error, selectedDistrictId, level, fetchData, runSpatialAnalysis, evaluatePointSuitability, clearAnalysisSites])
+  }), [districts, schools, sites, analysisSites, loading, error, selectedDistrictId, level, availableDatasets, fetchAvailableDatasets, fetchData, runSpatialAnalysis, evaluatePointSuitability, clearAnalysisSites])
 
   return (
     <DataContext.Provider value={contextValue}>

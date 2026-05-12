@@ -7,6 +7,7 @@ import {
   HiOutlineOfficeBuilding, 
   HiOutlineLocationMarker, 
   HiOutlineDocumentText, 
+  HiOutlineDatabase,
   HiOutlineCog,
   HiOutlineLogout
 } from 'react-icons/hi'
