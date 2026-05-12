@@ -20,7 +20,7 @@ export default function Login() {
 
   function reset() { setError(null); setSuccess(null) }
 
-  /* ─── Sign In ────────────────────────────────────────────────────────────── */
+  /* Sign In */
   async function handleSignIn(e) {
     e.preventDefault()
     reset()
@@ -37,7 +37,7 @@ export default function Login() {
     }
   }
 
-  /* ─── Sign Up ────────────────────────────────────────────────────────────── */
+  /*  Sign Up */
   async function handleSignUp(e) {
     e.preventDefault()
     reset()

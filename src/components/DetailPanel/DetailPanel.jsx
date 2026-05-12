@@ -8,6 +8,7 @@ const STAT_ICONS = {
   pop:   <HiOutlineUsers className="w-5 h-5 text-indigo-500" />,
   inst:  <HiOutlineOfficeBuilding className="w-5 h-5 text-brand-500" />,
   site:  <HiOutlineLocationMarker className="w-5 h-5 text-red-500"   />,
+  pop:   <HiOutlineUsers className="w-5 h-5 text-blue-500" />,
 }
 
 export default function DetailPanel({ district, level, onClose }) {
