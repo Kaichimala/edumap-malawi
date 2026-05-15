@@ -555,6 +555,12 @@ export default function MapView({
       <MapContainer
         center={[-13.5, 34.3]}
         zoom={6}
+        minZoom={6}
+        maxBounds={[
+          [-17.5, 32.5], // Southwest coordinates
+          [-9.0, 36.0]   // Northeast coordinates
+        ]}
+        maxBoundsViscosity={1.0}
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%', zIndex: 0 }}
       >
